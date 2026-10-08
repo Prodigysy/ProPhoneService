@@ -340,6 +340,11 @@ const visitError = $derived((() => {
 		align-items: start;
 	}
 
+	.grid > :global(*) {
+		/* let form/estimate shrink inside grid tracks on narrow screens */
+		min-width: 0;
+	}
+
 	/* ── Form ── */
 	.form-head {
 		display: flex;

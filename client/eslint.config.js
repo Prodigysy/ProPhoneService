@@ -30,6 +30,6 @@ export default ts.config(
     },
   },
   {
-    ignores: ['dist/', 'coverage/', 'node_modules/', '.svelte-kit/'],
+    ignores: ['dist/', 'build/', 'coverage/', 'node_modules/', '.svelte-kit/'],
   },
 );
