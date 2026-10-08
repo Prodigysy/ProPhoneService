@@ -1,10 +1,12 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import ts from 'typescript-eslint';
+import svelte from 'eslint-plugin-svelte';
 
 export default ts.config(
   js.configs.recommended,
   ...ts.configs.recommended,
+  ...svelte.configs['flat/recommended'],
   {
     languageOptions: {
       globals: {
@@ -14,6 +16,20 @@ export default ts.config(
     },
   },
   {
-    ignores: ['dist/', 'coverage/', 'node_modules/'],
+    files: ['**/*.svelte.js', '**/*.svelte.ts'],
+    languageOptions: {
+      parser: ts.parser,
+    },
+  },
+  {
+    files: ['**/*.svelte'],
+    languageOptions: {
+      parserOptions: {
+        parser: ts.parser,
+      },
+    },
+  },
+  {
+    ignores: ['dist/', 'coverage/', 'node_modules/', '.svelte-kit/'],
   },
 );
