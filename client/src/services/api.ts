@@ -171,17 +171,101 @@ const orders: RepairOrderDto[] = [
 	}
 ];
 
-// Master panel counters from the mockup (until the backend provides real stats).
-export const masterStats = {
-	todayCount: 12,
-	todayDelta: '+3 к предыдущему дню',
-	inWork: 8,
-	inWorkNote: 'Ещё 3 — на диагностике',
-	revenueMonth: '24 890 ₽',
-	revenueNote: 'Октябрь 2026 · 4 ремонта',
-	clientsCount: 12,
-	totalOrders: 57
-};
+// Master panel stats, computed from the mock store (mirrors the mockup cards).
+// Backend will expose real counters later; shape matches what the UI needs.
+
+export interface MasterStats {
+	/** New orders today */
+	todayCount: number;
+	todayDelta: string;
+	/** InProgress + Agreed */
+	inWork: number;
+	inWorkNote: string;
+	/** Sum of Completed order prices this month, formatted */
+	revenueMonth: string;
+	revenueNote: string;
+	/** Distinct clients in the store */
+	clientsCount: number;
+	/** Total orders in the store */
+	totalOrders: number;
+	/** Count per status, for filter chips */
+	statusCounts: Record<RepairStatus, number>;
+}
+
+const priceFormat = new Intl.NumberFormat('ru-RU');
+
+function computeMasterStats(now = new Date()): MasterStats {
+	const statusCounts: Record<RepairStatus, number> = {
+		Created: 0,
+		InDiagnostic: 0,
+		Agreed: 0,
+		InProgress: 0,
+		Ready: 0,
+		Completed: 0,
+		Cancelled: 0
+	};
+	let todayCount = 0;
+	let yesterdayCount = 0;
+	let inWork = 0;
+	let inDiagnostic = 0;
+	const clients = new Set<string>();
+	const nowMonth = now.getUTCMonth();
+	const nowYear = now.getUTCFullYear();
+	const monthStart = Date.UTC(nowYear, nowMonth, 1);
+	let monthRevenue = 0;
+	let monthCompleted = 0;
+
+	for (const order of orders) {
+		statusCounts[order.status]++;
+		clients.add(order.clientName);
+		const created = new Date(order.createdAt);
+		if (sameUtcDay(created, now)) todayCount++;
+		if (sameUtcDay(created, new Date(now.getTime() - 86_400_000))) yesterdayCount++;
+		if (order.status === 'InProgress' || order.status === 'Agreed') inWork++;
+		if (order.status === 'InDiagnostic') inDiagnostic++;
+		if (
+			order.status === 'Completed' &&
+			order.price !== null &&
+			new Date(order.createdAt).getTime() >= monthStart
+		) {
+			monthRevenue += order.price;
+			monthCompleted++;
+		}
+	}
+
+	const monthName = now.toLocaleDateString('ru-RU', { month: 'long', timeZone: 'UTC' });
+	const delta = todayCount - yesterdayCount;
+	return {
+		todayCount,
+		todayDelta:
+			delta === 0
+				? 'как вчера'
+				: `${delta > 0 ? '+' : ''}${delta} к предыдущему дню`,
+		inWork,
+		inWorkNote: inDiagnostic > 0 ? `Ещё ${inDiagnostic} — на диагностике` : 'Все вне диагностики',
+		revenueMonth: `${priceFormat.format(monthRevenue)} ₽`,
+		revenueNote: `${monthName} ${now.getUTCFullYear()} · ${monthCompleted} ${pluralize(monthCompleted, ['ремонт', 'ремонта', 'ремонтов'])}`,
+		clientsCount: clients.size,
+		totalOrders: orders.length,
+		statusCounts
+	};
+}
+
+function sameUtcDay(a: Date, b: Date): boolean {
+	return (
+		a.getUTCFullYear() === b.getUTCFullYear() &&
+		a.getUTCMonth() === b.getUTCMonth() &&
+		a.getUTCDate() === b.getUTCDate()
+	);
+}
+
+function pluralize(n: number, forms: [string, string, string]): string {
+	const mod10 = n % 10;
+	const mod100 = n % 100;
+	if (mod10 === 1 && mod100 !== 11) return forms[0];
+	if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+	return forms[2];
+}
 
 let nextOrderNumber = 1049;
 
@@ -209,6 +293,14 @@ export async function fetchOrders(): Promise<RepairOrderDto[]> {
 		return [...orders];
 	}
 	return request<RepairOrderDto[]>('/orders');
+}
+
+export async function fetchMasterStats(): Promise<MasterStats> {
+	if (useMocks) {
+		await delay(150);
+		return computeMasterStats();
+	}
+	return request<MasterStats>('/master/stats');
 }
 
 export async function fetchOrderByNumber(number: string): Promise<RepairOrderDto> {
