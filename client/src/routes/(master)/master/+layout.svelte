@@ -359,24 +359,31 @@
 		.sidebar {
 			flex-direction: row;
 			align-items: center;
-			overflow-x: auto;
-			gap: 16px;
+			gap: 12px;
 			padding: 12px 16px;
+			min-width: 0;
+			flex-wrap: wrap;
 		}
 
 		.sidebar__top {
 			display: flex;
 			align-items: baseline;
 			gap: 8px;
+			flex-shrink: 0;
 		}
 
 		.sidebar__nav {
 			flex-direction: row;
+			flex-wrap: wrap;
+			min-width: 0;
+		}
+
+		.sidebar__item {
+			padding: 8px 10px;
 		}
 
 		.sidebar__bottom {
 			margin-top: 0;
-			margin-left: auto;
 		}
 
 		.sidebar__back,
@@ -389,11 +396,35 @@
 
 		.topbar {
 			padding: 0 16px;
+			gap: 10px;
+		}
+
+		.topbar__crumbs {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
 		}
 
 		.topbar__crumb:not(.topbar__crumb--current),
 		.topbar__crumb-sep {
 			display: none;
+		}
+
+		.topbar__actions {
+			gap: 8px;
+			min-width: 0;
+		}
+
+		.topbar__theme,
+		.topbar__avatar {
+			display: none;
+		}
+
+		.topbar__new {
+			padding: 9px 14px;
+			font-size: 13px;
+			white-space: nowrap;
 		}
 
 		.workspace__main {
