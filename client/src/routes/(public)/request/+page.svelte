@@ -100,6 +100,7 @@ const visitError = $derived((() => {
 		if (!formValid || submitting) return;
 
 		submitting = true;
+		let result: { number: string };
 		try {
 			const payload: CreateOrderPayload = {
 				deviceName,
@@ -109,14 +110,21 @@ const visitError = $derived((() => {
 				problemId,
 				estimateTotal
 			};
-			const result = await createOrder(payload);
-			goto(`/request/success?number=${encodeURIComponent(result.number)}&device=${encodeURIComponent(deviceName)}&problem=${encodeURIComponent(problem?.label ?? '')}&price=${estimateTotal}&date=${encodeURIComponent(visitDate)}`, {
-				state: { ...payload, number: result.number }
-			});
+			result = await createOrder(payload);
 		} catch {
 			showToast('Не удалось отправить заявку. Попробуйте ещё раз.', 'error');
 			submitting = false;
+			return;
 		}
+
+		const query = new URLSearchParams({
+			number: result.number,
+			device: deviceName,
+			problem: problem?.label ?? '',
+			price: String(estimateTotal),
+			date: visitDate
+		});
+		await goto(`/request/success?${query}`);
 	}
 </script>
 
