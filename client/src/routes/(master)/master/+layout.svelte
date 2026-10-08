@@ -1,16 +1,20 @@
 <script lang="ts">
 	import Toast from '#lib/components/Toast.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
-	import { masterProfile } from '../../../mocks/db.ts';
+	import { theme } from '#lib/theme/theme.svelte.ts';
+	import { masterProfile, workshop } from '../../../mocks/db.ts';
 
 	let { children } = $props();
 
 	const navItems = [
-		{ id: 'orders', label: 'Заявки', count: '12', active: true },
-		{ id: 'clients', label: 'Клиенты', count: null, active: false },
-		{ id: 'price', label: 'Прайс-лист', count: null, active: false },
-		{ id: 'reports', label: 'Отчёты', count: null, active: false }
+		{ id: 'orders', label: 'Заявки' },
+		{ id: 'clients', label: 'Клиенты' },
+		{ id: 'price', label: 'Прайс-лист' },
+		{ id: 'reports', label: 'Отчёты' }
 	];
+
+	// Mockup: «Заявки · 12» — live count until the backend provides stats.
+	const ordersCount = 12;
 </script>
 
 <div class="workspace">
@@ -18,15 +22,15 @@
 		<div class="sidebar__top">
 			<a class="sidebar__logo" href="/">про телефон</a>
 			<p class="sidebar__sub">Рабочий кабинет</p>
-			<p class="sidebar__address">Покровка, 17</p>
+			<p class="sidebar__address">{workshop.address.split(', ').slice(-1)[0]}</p>
 		</div>
 
 		<nav class="sidebar__nav" aria-label="Разделы кабинета">
 			{#each navItems as item (item.id)}
-				{#if item.active}
+				{#if item.id === 'orders'}
 					<a class="sidebar__item sidebar__item--active" href="/master/orders" aria-current="page">
 						{item.label}
-						{#if item.count}<span class="sidebar__count">{item.count}</span>{/if}
+						<span class="sidebar__count">{ordersCount}</span>
 					</a>
 				{:else}
 					<button
@@ -35,13 +39,16 @@
 						onclick={() => showToast('Раздел в разработке')}
 					>
 						{item.label}
-						{#if item.count}<span class="sidebar__count">{item.count}</span>{/if}
 					</button>
 				{/if}
 			{/each}
 		</nav>
 
 		<div class="sidebar__bottom">
+			<div class="sidebar__status">
+				<p class="sidebar__status-title">Мастерская открыта</p>
+				<p class="sidebar__status-note">Смена до {workshop.closeAt}</p>
+			</div>
 			<a class="sidebar__profile" href="/master/orders">
 				<span class="sidebar__avatar" aria-hidden="true">{masterProfile.initials}</span>
 				<span class="sidebar__profile-info">
@@ -53,9 +60,46 @@
 		</div>
 	</aside>
 
-	<main class="workspace__main">
-		{@render children()}
-	</main>
+	<div class="workspace__right">
+		<header class="topbar">
+			<nav class="topbar__crumbs" aria-label="Раздел">
+				<span class="topbar__crumb">Рабочий кабинет</span>
+				<span class="topbar__crumb-sep" aria-hidden="true">·</span>
+				<span class="topbar__crumb topbar__crumb--current">
+					{navItems.find((i) => i.id === 'orders')?.label ?? 'Заявки'}
+				</span>
+			</nav>
+
+			<div class="topbar__actions">
+				<div class="topbar__theme" role="group" aria-label="Тема оформления">
+					<button
+						class="theme-btn"
+						class:theme-btn--active={theme.value === 'light'}
+						type="button"
+						aria-pressed={theme.value === 'light'}
+						onclick={() => theme.set('light')}
+					>
+						Светлая
+					</button>
+					<button
+						class="theme-btn"
+						class:theme-btn--active={theme.value === 'dark'}
+						type="button"
+						aria-pressed={theme.value === 'dark'}
+						onclick={() => theme.set('dark')}
+					>
+						Тёмная
+					</button>
+				</div>
+				<a class="topbar__new" href="/request">+ Новая заявка</a>
+				<span class="topbar__avatar" aria-hidden="true">{masterProfile.initials}</span>
+			</div>
+		</header>
+
+		<main class="workspace__main">
+			{@render children()}
+		</main>
+	</div>
 </div>
 <Toast />
 
@@ -66,6 +110,7 @@
 		min-height: 100vh;
 	}
 
+	/* ── Sidebar ── */
 	.sidebar {
 		display: flex;
 		flex-direction: column;
@@ -143,6 +188,24 @@
 		gap: 12px;
 	}
 
+	.sidebar__status {
+		background: var(--success-soft);
+		border-radius: 12px;
+		padding: 12px 14px;
+	}
+
+	.sidebar__status-title {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--success);
+	}
+
+	.sidebar__status-note {
+		font-size: 12px;
+		color: var(--muted);
+		margin-top: 2px;
+	}
+
 	.sidebar__profile {
 		display: flex;
 		align-items: center;
@@ -161,6 +224,7 @@
 		color: #ffffff;
 		font-size: 13px;
 		font-weight: 600;
+		flex-shrink: 0;
 	}
 
 	.sidebar__profile-info {
@@ -182,6 +246,104 @@
 	.sidebar__back {
 		font-size: 13px;
 		color: var(--accent);
+	}
+
+	/* ── Right column: topbar + main ── */
+	.workspace__right {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		min-height: 64px;
+		padding: 0 32px;
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+	}
+
+	.topbar__crumbs {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 14px;
+	}
+
+	.topbar__crumb {
+		color: var(--muted);
+	}
+
+	.topbar__crumb--current {
+		color: var(--text);
+		font-weight: 500;
+	}
+
+	.topbar__crumb-sep {
+		color: var(--muted);
+	}
+
+	.topbar__actions {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+
+	.topbar__theme {
+		display: inline-flex;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 3px;
+		gap: 2px;
+	}
+
+	.theme-btn {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--muted);
+		border-radius: 999px;
+		padding: 6px 14px;
+		transition:
+			background-color 0.15s ease,
+			color 0.15s ease;
+	}
+
+	.theme-btn--active {
+		background: var(--accent);
+		color: #ffffff;
+	}
+
+	.topbar__new {
+		font-size: 14px;
+		font-weight: 500;
+		background: var(--accent);
+		color: #ffffff;
+		border-radius: 12px;
+		padding: 11px 18px;
+		transition: background-color 0.15s ease;
+	}
+
+	.topbar__new:hover {
+		background: var(--accent-hover);
+	}
+
+	.topbar__avatar {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		background: var(--accent-soft);
+		color: var(--accent);
+		font-size: 13px;
+		font-weight: 600;
 	}
 
 	.workspace__main {
@@ -220,7 +382,17 @@
 		.sidebar__back,
 		.sidebar__profile-info,
 		.sidebar__address,
-		.sidebar__sub {
+		.sidebar__sub,
+		.sidebar__status {
+			display: none;
+		}
+
+		.topbar {
+			padding: 0 16px;
+		}
+
+		.topbar__crumb:not(.topbar__crumb--current),
+		.topbar__crumb-sep {
 			display: none;
 		}
 
