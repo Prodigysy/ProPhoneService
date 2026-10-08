@@ -28,6 +28,9 @@ appsettings.Local.json
 
 # Node / frontend
 node_modules/
+
+# SvelteKit build output
+client/build/
 dist/
 dist-ssr/
 .svelte-kit/
