@@ -89,7 +89,7 @@
 					<h2 class="card__name">{serviceMeta(service.name).displayName}</h2>
 					<p class="card__desc">{service.description ?? serviceMeta(service.name).description}</p>
 				</header>
-				<p class="card__single-price">Стоимость {priceText(service.price).toLowerCase()}</p>
+				<p class="card__single-price">Стоимость {priceText(service.price)}</p>
 				<p class="card__duration">Срок: {serviceMeta(service.name).duration}</p>
 			</article>
 		{:else}
@@ -297,6 +297,11 @@
 
 	/* ---------- Responsive ---------- */
 	@media (max-width: 900px) {
+		/* V2's mobile price list shows cards only, without the filter row. */
+		.toolbar {
+			display: none;
+		}
+
 		.table-wrap {
 			display: none;
 		}
