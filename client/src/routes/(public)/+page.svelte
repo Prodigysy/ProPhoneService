@@ -157,12 +157,12 @@
 		<div class="map-section__grid">
 			<div class="map-frame">
 				<iframe
-					src="https://yandex.ru/map-widget/v1/?text=Москва, Покровка 17&z=17"
-					title="Карта: Москва, ул. Покровка, 17"
+					src="https://yandex.ru/map-widget/v1/?text=Самара, проспект Ленина, 12А&z=17"
+					title="Карта: Самара, проспект Ленина, 12А"
 					loading="lazy"
 					allowfullscreen
 				></iframe>
-				<a class="map-frame__fallback" href="https://yandex.ru/maps/?text=Москва, улица Покровка, 17" target="_blank" rel="noreferrer">
+				<a class="map-frame__fallback" href="https://yandex.ru/maps/?text=Самара, проспект Ленина, 12А" target="_blank" rel="noreferrer">
 					Открыть в Яндекс Картах ↗
 				</a>
 			</div>

@@ -2,7 +2,7 @@
 	import Toast from '#lib/components/Toast.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
 	import { theme } from '#lib/theme/theme.svelte.ts';
-	import { masterProfile, workshop, getWorkshopStatus } from '../../../mocks/db.ts';
+	import { masterProfile, workshop } from '../../../mocks/db.ts';
 
 	let { children } = $props();
 
@@ -14,15 +14,14 @@
 	];
 
 	const ordersCount = 12;
-	const workshopStatus = getWorkshopStatus();
 </script>
 
 <div class="workspace">
 	<aside class="sidebar">
 		<div class="sidebar__top">
 			<a class="sidebar__logo" href="/">про телефон</a>
-			<p class="sidebar__sub">Рабочий кабинет</p>
-			<p class="sidebar__address">{workshop.address.split(', ').slice(-1)[0]}</p>
+			<p class="sidebar__sub">Рабочая мастерская</p>
+			<p class="sidebar__address">{workshop.addressShort}</p>
 		</div>
 
 		<nav class="sidebar__nav" aria-label="Разделы кабинета">
@@ -45,10 +44,6 @@
 		</nav>
 
 		<div class="sidebar__bottom">
-			<div class="sidebar__status">
-				<p class="sidebar__status-title">{workshopStatus.isOpen ? 'Мастерская открыта' : 'Мастерская закрыта'}</p>
-				<p class="sidebar__status-note">{workshopStatus.message}</p>
-			</div>
 			<a class="sidebar__profile" href="/master/orders">
 				<span class="sidebar__avatar" aria-hidden="true">{masterProfile.initials}</span>
 				<span class="sidebar__profile-info">
@@ -125,7 +120,10 @@
 	}
 
 	.sidebar__sub {
-		font-size: 13px;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--muted);
 		margin-top: 4px;
 	}
@@ -185,24 +183,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-	}
-
-	.sidebar__status {
-		background: var(--success-soft);
-		border-radius: 12px;
-		padding: 12px 14px;
-	}
-
-	.sidebar__status-title {
-		font-size: 13px;
-		font-weight: 500;
-		color: var(--success);
-	}
-
-	.sidebar__status-note {
-		font-size: 12px;
-		color: var(--muted);
-		margin-top: 2px;
 	}
 
 	.sidebar__profile {
@@ -375,8 +355,7 @@
 		.sidebar__back,
 		.sidebar__profile-info,
 		.sidebar__address,
-		.sidebar__sub,
-		.sidebar__status {
+		.sidebar__sub {
 			display: none;
 		}
 
