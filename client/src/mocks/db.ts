@@ -8,11 +8,13 @@ export interface WorkshopInfo {
 	metroDistance: string;
 	phone: string;
 	hours: string;
-	openAt: string; // 'HH:mm' local Moscow time
+	timeZone: string;
+	workingDays: number[]; // ISO-8601: Monday=1 … Sunday=7
+	openAt: string;
 	closeAt: string;
 	telegramUrl: string;
 	warrantyDays: number;
-	diagnosticsPrice: number; // 0 ₽
+	diagnosticsPrice: number;
 }
 
 export const workshop: WorkshopInfo = {
@@ -21,13 +23,92 @@ export const workshop: WorkshopInfo = {
 	metro: 'Чистые пруды',
 	metroDistance: '7 минут от метро «Чистые пруды»',
 	phone: '+7 (495) 120-45-67',
-	hours: 'Ежедневно · 10:00–20:00',
+	hours: 'Пн–Пт · 10:00–19:00',
+	timeZone: 'Europe/Samara',
+	workingDays: [1, 2, 3, 4, 5],
 	openAt: '10:00',
-	closeAt: '20:00',
+	closeAt: '19:00',
 	telegramUrl: 'https://t.me/prophoneservice',
 	warrantyDays: 90,
 	diagnosticsPrice: 0
 };
+
+export interface WorkshopStatus {
+	isOpen: boolean;
+	message: string;
+}
+
+export function getWorkshopStatus(now = new Date()): WorkshopStatus {
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone: workshop.timeZone,
+		weekday: 'short',
+		hour: '2-digit',
+		minute: '2-digit',
+		hourCycle: 'h23'
+	}).formatToParts(now);
+	const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+	const weekdayByName: Record<string, number> = {
+		Mon: 1,
+		Tue: 2,
+		Wed: 3,
+		Thu: 4,
+		Fri: 5,
+		Sat: 6,
+		Sun: 7
+	};
+	const weekday = weekdayByName[values.weekday] ?? 0;
+	const minuteOfDay = Number(values.hour) * 60 + Number(values.minute);
+	const openMinute = Number(workshop.openAt.slice(0, 2)) * 60 + Number(workshop.openAt.slice(3));
+	const closeMinute = Number(workshop.closeAt.slice(0, 2)) * 60 + Number(workshop.closeAt.slice(3));
+	const isWorkingDay = workshop.workingDays.includes(weekday);
+
+	if (!isWorkingDay) {
+		return { isOpen: false, message: `Выходной · ${workshop.hours}` };
+	}
+	if (minuteOfDay < openMinute) {
+		return { isOpen: false, message: `Откроемся в ${workshop.openAt}` };
+	}
+	if (minuteOfDay >= closeMinute) {
+		return {
+			isOpen: false,
+			message: weekday === 5 ? 'Закрыто · откроемся в понедельник в 10:00' : `Закрыто · откроемся завтра в ${workshop.openAt}`
+		};
+	}
+	return { isOpen: true, message: `Сегодня открыты до ${workshop.closeAt}` };
+}
+
+const WORKSHOP_TIME_PARTS = new Intl.DateTimeFormat('en-US', {
+	timeZone: workshop.timeZone,
+	year: 'numeric',
+	month: '2-digit',
+	day: '2-digit',
+	hour: '2-digit',
+	minute: '2-digit',
+	hourCycle: 'h23'
+});
+
+/**
+ * Convert a wall-clock date/time in the workshop timezone into an ISO UTC instant.
+ * The backend requires `PreferredVisitAt` as `DateTimeOffset`, and the visit slots
+ * are shown to the client in workshop-local time.
+ */
+export function workshopWallTimeToUtcIso(date: string, time: string): string {
+	const [year, month, day] = date.split('-').map(Number);
+	const [hour, minute] = time.split(':').map(Number);
+	const asUtc = Date.UTC(year, month - 1, day, hour, minute);
+	const parts = Object.fromEntries(
+		WORKSHOP_TIME_PARTS.formatToParts(new Date(asUtc)).map((part) => [part.type, part.value])
+	);
+	const shownAsUtc = Date.UTC(
+		Number(parts.year),
+		Number(parts.month) - 1,
+		Number(parts.day),
+		Number(parts.hour),
+		Number(parts.minute)
+	);
+
+	return new Date(asUtc - (shownAsUtc - asUtc)).toISOString();
+}
 
 export interface DeviceModel {
 	id: string;
@@ -135,11 +216,11 @@ export interface ProblemOption {
 }
 
 export const problems: ProblemOption[] = [
-	{ id: 'battery', label: 'Быстро разряжается · замена аккумулятора', serviceId: 'battery', partsPrice: 2490, workPrice: 1000 },
-	{ id: 'screen', label: 'Разбит экран', serviceId: 'display', partsPrice: 3490, workPrice: 1500 },
-	{ id: 'charging', label: 'Не заряжается', serviceId: 'charging-port', partsPrice: 1490, workPrice: 1000 },
-	{ id: 'water', label: 'Попала вода', serviceId: 'water', partsPrice: 990, workPrice: 2000 },
-	{ id: 'camera', label: 'Камера не фокусируется', serviceId: 'camera', partsPrice: 2490, workPrice: 1000 },
+	{ id: 'battery', label: 'Быстро разряжается · замена аккумулятора', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e04', partsPrice: 2490, workPrice: 1000 },
+	{ id: 'screen', label: 'Разбит экран', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e02', partsPrice: 3490, workPrice: 1500 },
+	{ id: 'charging', label: 'Не заряжается', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e03', partsPrice: 1490, workPrice: 1000 },
+	{ id: 'water', label: 'Попала вода', serviceId: null, partsPrice: 990, workPrice: 2000 },
+	{ id: 'camera', label: 'Камера не фокусируется', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e08', partsPrice: 2490, workPrice: 1000 },
 	{ id: 'other', label: 'Другая проблема', serviceId: null, partsPrice: 0, workPrice: 0 }
 ];
 

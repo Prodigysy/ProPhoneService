@@ -1,20 +1,11 @@
 <script lang="ts">
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
-	import { workshop, workshopStats, masterProfile, aboutText, steps, reviews, heroTrust } from '../../mocks/db.ts';
+	import { workshop, workshopStats, masterProfile, aboutText, steps, reviews, heroTrust, getWorkshopStatus } from '../../mocks/db.ts';
 
-	// Live open/closed status computed in Europe/Moscow (workshop timezone).
-	const moscowNow = new Date(
-		new Date().toLocaleString('en-US', { timeZone: 'Europe/Moscow' })
-	);
-	const hours = moscowNow.getHours();
-	const opensAt = Number(workshop.openAt.slice(0, 2));
-	const closesAt = Number(workshop.closeAt.slice(0, 2));
-	const isOpen = hours >= opensAt && hours < closesAt;
-
-	const openStatus = isOpen
-		? `Сегодня открыты до ${workshop.closeAt}`
-		: `Сейчас закрыто · откроем в ${workshop.openAt}`;
+	const workshopStatus = getWorkshopStatus();
+	const isOpen = workshopStatus.isOpen;
+	const openStatus = workshopStatus.message;
 </script>
 
 <!-- ================= Hero ================= -->

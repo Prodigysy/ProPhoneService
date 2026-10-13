@@ -2,7 +2,7 @@
 	import Toast from '#lib/components/Toast.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
 	import { theme } from '#lib/theme/theme.svelte.ts';
-	import { masterProfile, workshop } from '../../../mocks/db.ts';
+	import { masterProfile, workshop, getWorkshopStatus } from '../../../mocks/db.ts';
 
 	let { children } = $props();
 
@@ -13,8 +13,8 @@
 		{ id: 'reports', label: 'Отчёты' }
 	];
 
-	// Mockup: «Заявки · 12» — live count until the backend provides stats.
 	const ordersCount = 12;
+	const workshopStatus = getWorkshopStatus();
 </script>
 
 <div class="workspace">
@@ -46,8 +46,8 @@
 
 		<div class="sidebar__bottom">
 			<div class="sidebar__status">
-				<p class="sidebar__status-title">Мастерская открыта</p>
-				<p class="sidebar__status-note">Смена до {workshop.closeAt}</p>
+				<p class="sidebar__status-title">{workshopStatus.isOpen ? 'Мастерская открыта' : 'Мастерская закрыта'}</p>
+				<p class="sidebar__status-note">{workshopStatus.message}</p>
 			</div>
 			<a class="sidebar__profile" href="/master/orders">
 				<span class="sidebar__avatar" aria-hidden="true">{masterProfile.initials}</span>
@@ -91,7 +91,6 @@
 						Тёмная
 					</button>
 				</div>
-				<a class="topbar__new" href="/request">+ Новая заявка</a>
 				<span class="topbar__avatar" aria-hidden="true">{masterProfile.initials}</span>
 			</div>
 		</header>
@@ -319,19 +318,6 @@
 		color: #ffffff;
 	}
 
-	.topbar__new {
-		font-size: 14px;
-		font-weight: 500;
-		background: var(--accent);
-		color: #ffffff;
-		border-radius: 12px;
-		padding: 11px 18px;
-		transition: background-color 0.15s ease;
-	}
-
-	.topbar__new:hover {
-		background: var(--accent-hover);
-	}
 
 	.topbar__avatar {
 		display: inline-flex;
@@ -419,12 +405,6 @@
 		.topbar__theme,
 		.topbar__avatar {
 			display: none;
-		}
-
-		.topbar__new {
-			padding: 9px 14px;
-			font-size: 13px;
-			white-space: nowrap;
 		}
 
 		.workspace__main {
