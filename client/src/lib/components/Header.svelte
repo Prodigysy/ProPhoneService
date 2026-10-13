@@ -1,22 +1,35 @@
 <script lang="ts">
 	import { theme } from '#lib/theme/theme.svelte.ts';
+	import { page } from '$app/state';
 
 	interface Props {
 		class?: string;
 	}
 
 	let { class: className = '' }: Props = $props();
+
+	const isActive = (href: string, exact = false) =>
+		exact ? page.url.pathname === href : page.url.pathname.startsWith(href);
 </script>
 
 <header class="header {className}">
 	<div class="container header__inner">
 		<a class="header__logo" href="/" aria-label="про телефон — на главную">
-			<span class="header__logo-mark">про</span>телефон
+			<span class="header__logo-mark" aria-hidden="true">
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+					<rect x="7" y="3" width="10" height="18" rx="2.5" stroke="currentColor" stroke-width="2" />
+					<path d="M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+				</svg>
+			</span>
+			<span class="header__logo-text">
+				<span class="header__logo-name">про телефон</span>
+				<span class="header__logo-caption" aria-hidden="true">Мастерская рядом</span>
+			</span>
 		</a>
 
 		<nav class="header__nav" aria-label="Основная навигация">
-			<a class="header__link" href="/">Главная</a>
-			<a class="header__link" href="/price">Прайс-лист</a>
+			<a class="header__link" class:header__link--active={isActive('/', true)} aria-current={isActive('/', true) ? 'page' : undefined} href="/">Главная</a>
+			<a class="header__link" class:header__link--active={isActive('/price')} aria-current={isActive('/price') ? 'page' : undefined} href="/price">Прайс-лист</a>
 			<button
 				class="header__link header__link--disabled"
 				type="button"
@@ -28,14 +41,15 @@
 		</nav>
 
 		<div class="header__actions">
-			<button
-				class="theme-toggle"
-				type="button"
-				aria-label={theme.value === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
-				onclick={() => theme.toggle()}
-			>
-				{#if theme.value === 'dark'}
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+			<div class="header__theme" role="group" aria-label="Тема оформления">
+				<button
+					class="theme-btn"
+					class:theme-btn--active={theme.value === 'light'}
+					type="button"
+					aria-pressed={theme.value === 'light'}
+					onclick={() => theme.set('light')}
+				>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
 						<circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2" />
 						<path
 							d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4"
@@ -44,19 +58,21 @@
 							stroke-linecap="round"
 						/>
 					</svg>
-					<span>Светлая</span>
-				{:else}
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-						<path
-							d="M20 13.5A8 8 0 1 1 10.5 4a6.6 6.6 0 0 0 9.5 9.5Z"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linejoin="round"
-						/>
+					Светлая
+				</button>
+				<button
+					class="theme-btn"
+					class:theme-btn--active={theme.value === 'dark'}
+					type="button"
+					aria-pressed={theme.value === 'dark'}
+					onclick={() => theme.set('dark')}
+				>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+						<path d="M20 13.5A8 8 0 1 1 10.5 4a6.6 6.6 0 0 0 9.5 9.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
 					</svg>
-					<span>Тёмная</span>
-				{/if}
-			</button>
+					Тёмная
+				</button>
+			</div>
 			<a class="header__cta" href="/request">Оставить заявку</a>
 		</div>
 	</div>
@@ -80,34 +96,68 @@
 	}
 
 	.header__logo {
-		font-size: 20px;
-		font-weight: 600;
-		letter-spacing: -0.02em;
 		display: inline-flex;
-		gap: 4px;
+		align-items: center;
+		gap: 10px;
+		text-decoration: none;
 	}
 
 	.header__logo-mark {
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
 		background: var(--accent);
 		color: #ffffff;
-		border-radius: 8px;
-		padding: 0 6px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.header__logo-text {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.15;
+	}
+
+	.header__logo-name {
+		font-size: 17px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--text);
+	}
+
+	.header__logo-caption {
+		font-size: 9px;
+		font-weight: 500;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted);
 	}
 
 	.header__nav {
 		display: flex;
-		gap: 28px;
+		gap: 8px;
 	}
 
-.header__link {
-	font-size: 14px;
-	font-weight: 500;
-	color: var(--muted);
-}
+	.header__link {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--muted);
+		padding: 8px 14px;
+		border-radius: 999px;
+	}
+	.header__link:hover {
+		color: var(--text);
+	}
 
-.header__link:hover {
-	color: var(--text);
-}
+	.header__link--active {
+		background: var(--accent-soft);
+		color: var(--accent);
+	}
+
+	.header__link--active:hover {
+		color: var(--accent);
+	}
 
 	.header__link--disabled {
 		cursor: not-allowed;
@@ -123,24 +173,38 @@
 		gap: 16px;
 	}
 
-	.theme-toggle {
+	.header__theme {
+		display: inline-flex;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 3px;
+		gap: 2px;
+	}
+
+	.theme-btn {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
+		gap: 6px;
 		font-size: 12px;
 		font-weight: 500;
 		color: var(--muted);
-		border: 1px solid var(--border);
 		border-radius: 999px;
-		padding: 8px 14px;
+		padding: 6px 12px;
 		transition:
 			color 0.15s ease,
-			border-color 0.15s ease;
+			background-color 0.15s ease,
+			box-shadow 0.15s ease;
 	}
 
-	.theme-toggle:hover {
+	.theme-btn:hover {
 		color: var(--text);
-		border-color: var(--accent);
+	}
+
+	.theme-btn--active {
+		background: var(--surface);
+		color: var(--text);
+		box-shadow: var(--shadow-card);
 	}
 
 	.header__cta {
@@ -166,12 +230,8 @@
 			gap: 12px;
 		}
 
-		.theme-toggle span {
+		.header__theme {
 			display: none;
-		}
-
-		.theme-toggle {
-			padding: 10px;
 		}
 	}
 </style>

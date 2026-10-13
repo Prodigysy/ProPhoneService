@@ -6,32 +6,37 @@
 <footer class="footer">
 	<div class="container footer__inner">
 		<div class="footer__brand">
-			<span class="footer__logo"><span class="footer__logo-mark">про</span>телефон</span>
-			<p class="footer__tagline">Возвращаем связь с важным.</p>
-			<p class="footer__copyright">© 2026 «про телефон».</p>
-			<button
-				class="footer__policy"
-				type="button"
-				onclick={() => showToast('Политика конфиденциальности появится позже')}
-			>
-				Политика конфиденциальности
-			</button>
+			<span class="footer__logo" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+					<rect x="7" y="3" width="10" height="18" rx="2.5" stroke="currentColor" stroke-width="2" />
+					<path d="M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+				</svg>
+			</span>
+			<span class="footer__logo-name">про телефон</span>
+		</div>
+
+		<div class="footer__place">
+			<address class="footer__address">{workshop.address}</address>
+			<p class="footer__hours">{workshop.hours}</p>
 		</div>
 
 		<div class="footer__contacts">
-			<address class="footer__address">{workshop.address}</address>
-			<p class="footer__hours">{workshop.hours}</p>
 			<a class="footer__phone" href="tel:+74951204567">{workshop.phone}</a>
 			<a class="footer__telegram" href={workshop.telegramUrl} target="_blank" rel="noreferrer">
 				Написать в Telegram ↗
 			</a>
 		</div>
+	</div>
 
-		<nav class="footer__nav" aria-label="Разделы">
-			<a href="/">Главная</a>
-			<a href="/price">Прайс-лист</a>
-			<button type="button" aria-disabled="true" title="Скоро">Личный кабинет</button>
-		</nav>
+	<div class="container footer__bottom">
+		<p class="footer__copyright">© 2026 «Про телефон». Возвращаем связь с важным.</p>
+		<button
+			class="footer__policy"
+			type="button"
+			onclick={() => showToast('Политика конфиденциальности появится позже')}
+		>
+			Политика конфиденциальности
+		</button>
 	</div>
 </footer>
 
@@ -43,101 +48,104 @@
 
 	.footer__inner {
 		display: grid;
-		grid-template-columns: 1.4fr 1fr 0.7fr;
+		grid-template-columns: 1fr 1fr 1fr;
 		gap: 40px;
-		padding-block: 48px 40px;
+		align-items: start;
+		padding-block: 44px 36px;
+	}
+
+	.footer__brand {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
 
 	.footer__logo {
-		font-size: 19px;
-		font-weight: 600;
-		display: inline-flex;
-		gap: 4px;
-	}
-
-	.footer__logo-mark {
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
 		background: var(--accent);
 		color: #ffffff;
-		border-radius: 8px;
-		padding: 0 6px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 
-	.footer__tagline {
-		margin-top: 10px;
-		font-size: 15px;
+	.footer__logo-name {
+		font-size: 17px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+	}
+
+	.footer__place {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.footer__address {
+		font-style: normal;
+		font-size: 14px;
+		font-weight: 500;
+	}
+
+	.footer__hours {
+		font-size: 13px;
+		color: var(--muted);
+	}
+
+	.footer__contacts {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+	}
+
+	.footer__phone {
+		font-size: 17px;
+		font-weight: 600;
+	}
+
+	.footer__telegram {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--accent);
+	}
+
+	.footer__bottom {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 24px;
+		padding-block: 18px 24px;
+		border-top: 1px solid var(--border);
 	}
 
 	.footer__copyright {
-		margin-top: 18px;
 		font-size: 12px;
 		color: var(--muted);
 	}
 
 	.footer__policy {
-		display: block;
-		margin-top: 6px;
 		font-size: 12px;
 		color: var(--muted);
-		text-decoration: underline;
-		text-underline-offset: 3px;
 	}
 
 	.footer__policy:hover {
 		color: var(--text);
 	}
 
-	.footer__contacts {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		font-style: normal;
-	}
-
-	.footer__address {
-		font-size: 14px;
-	}
-
-	.footer__hours {
-		font-size: 12px;
-		color: var(--muted);
-	}
-
-	.footer__phone {
-		font-size: 18px;
-		font-weight: 500;
-	}
-
-	.footer__telegram {
-		font-size: 12px;
-		color: var(--accent);
-	}
-
-	.footer__nav {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		font-size: 14px;
-	}
-
-	.footer__nav a {
-		color: var(--muted);
-	}
-
-	.footer__nav a:hover {
-		color: var(--text);
-	}
-
-	.footer__nav button {
-		text-align: left;
-		color: var(--muted);
-		cursor: not-allowed;
-	}
-
 	@media (max-width: 768px) {
 		.footer__inner {
 			grid-template-columns: 1fr;
-			gap: 28px;
-			padding-block: 32px;
+			gap: 24px;
+			padding-block: 32px 24px;
+		}
+
+		.footer__bottom {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 10px;
 		}
 	}
 </style>

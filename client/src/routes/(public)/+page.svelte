@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
-	import { workshop, workshopStats, masterProfile, aboutText, steps, reviews, heroTrust, getWorkshopStatus } from '../../mocks/db.ts';
+	import { workshop, workshopStats, masterProfile, aboutText, steps, reviews, heroTrust, heroBadge, getWorkshopStatus } from '../../mocks/db.ts';
 
 	const workshopStatus = getWorkshopStatus();
 	const isOpen = workshopStatus.isOpen;
@@ -12,65 +12,92 @@
 <section class="hero">
 	<div class="container hero__inner">
 		<div class="hero__content">
-			<Eyebrow>Ремонт телефонов на Покровке</Eyebrow>
-			<h1 class="hero__title">
-				Телефон снова в деле.<br />Вы — на связи.
-			</h1>
+			<Eyebrow dot tone="muted">Ремонт телефонов на Покровке</Eyebrow>
+			<h1 class="hero__title">Телефон снова в деле.<br /><span class="hero__title-accent">Вы — на связи.</span></h1>
 			<p class="hero__subtitle">
 				Сломался телефон? Оставьте заявку без звонка. Узнайте цену заранее и отслеживайте ремонт онлайн.
 			</p>
 			<div class="hero__actions">
-				<Button href="/request" size="lg">Оставить заявку</Button>
+				<Button href="/request" size="lg">Оставить заявку ↗</Button>
 				<Button href="/price" variant="secondary" size="lg">Посмотреть цены</Button>
 			</div>
 			<ul class="hero__trust">
 				{#each heroTrust as item (item.title)}
 					<li class="trust-item">
-						<span class="trust-item__title">{item.title}</span>
-						{#if item.subtitle}
-							<span class="trust-item__subtitle">{item.subtitle}</span>
-						{/if}
+						<span class="trust-item__check" aria-hidden="true">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+								<path
+									d="m5 12.5 4.5 4.5L19 7.5"
+									stroke="currentColor"
+									stroke-width="2.4"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								/>
+							</svg>
+						</span>
+						{item.title}
 					</li>
 				{/each}
 			</ul>
 		</div>
 		<div class="hero__photo">
 			<img src="/hero.jpg" alt="Мастер ремонтирует телефон в мастерской" />
+			<div class="hero__badge">
+				<span class="hero__badge-icon" aria-hidden="true">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+						<path
+							d="M12 3 5 5.5V12c0 4.4 3 7.4 7 9 4-1.6 7-4.6 7-9V5.5L12 3Z"
+							stroke="currentColor"
+							stroke-width="1.8"
+							stroke-linejoin="round"
+						/>
+						<path d="m9 12 2.2 2.2L15.5 9.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+					</svg>
+				</span>
+				<div class="hero__badge-text">
+					<p class="hero__badge-title">{heroBadge.title}</p>
+					<p class="hero__badge-subtitle">{heroBadge.subtitle}</p>
+				</div>
+			</div>
 		</div>
 	</div>
 
 	<div class="container hero__location">
-		<div class="location">
-			<span class="location__pin" aria-hidden="true">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-					<path
-						d="M12 21s-7-5.1-7-11a7 7 0 1 1 14 0c0 5.9-7 11-7 11Z"
-						stroke="currentColor"
-						stroke-width="2"
-					/>
-					<circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" />
-				</svg>
-			</span>
-			<div class="location__info">
-				<strong>{workshop.address}</strong>
-				<span class="location__metro">{workshop.metroDistance}</span>
-			</div>
-		</div>
-		<div class="location">
-			<span class="location__pin" aria-hidden="true">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-					<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
-					<path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-				</svg>
-			</span>
-			<div class="location__info">
-				<strong>{workshop.hours}</strong>
-				<span class="location__status" class:location__status--open={isOpen} class:location__status--closed={!isOpen}>
-					{openStatus}
+		<div class="strip-card">
+			<div class="location">
+				<span class="location__pin" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+						<path
+							d="M12 21s-7-5.1-7-11a7 7 0 1 1 14 0c0 5.9-7 11-7 11Z"
+							stroke="currentColor"
+							stroke-width="2"
+						/>
+						<circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" />
+					</svg>
 				</span>
+				<div class="location__info">
+					<strong>{workshop.address}</strong>
+					<span class="location__metro">{workshop.metroDistance}</span>
+				</div>
 			</div>
+			<div class="location">
+				<span class="location__pin" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+						<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+						<path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+					</svg>
+				</span>
+				<div class="location__info">
+					<strong>{workshop.hours}</strong>
+					<span class="location__status" class:location__status--open={isOpen} class:location__status--closed={!isOpen}>
+						{openStatus}
+					</span>
+				</div>
+			</div>
+			<a class="location__link" href="https://yandex.ru/maps/?text={encodeURIComponent(workshop.address)}" target="_blank" rel="noreferrer">
+				Как нас найти ↗
+			</a>
 		</div>
-		<a class="location__link" href="#map">Как нас найти ↗</a>
 	</div>
 </section>
 
@@ -79,28 +106,31 @@
 	<div class="container about__inner">
 		<div class="about__text">
 			<Eyebrow>О мастерской</Eyebrow>
-			<h2 class="h2">Не просто техника. Ваши планы, фото и связь.</h2>
+			<h2 class="h2">Не просто техника.<br />Ваши планы, фото и связь.</h2>
 			<p class="about__paragraph">{aboutText}</p>
+		</div>
+		<div class="about__side">
 			<dl class="about__stats">
 				<div class="stat">
-					<dt class="stat__label">{workshopStats.yearsLabel}</dt>
 					<dd class="stat__value">{workshopStats.years}</dd>
+					<dt class="stat__label">{workshopStats.yearsLabel}</dt>
 				</div>
 				<div class="stat">
-					<dt class="stat__label">{workshopStats.savedLabel}</dt>
 					<dd class="stat__value">{workshopStats.saved}</dd>
+					<dt class="stat__label">{workshopStats.savedLabel}</dt>
 				</div>
 				<div class="stat">
-					<dt class="stat__label">{workshopStats.ratingLabel}</dt>
 					<dd class="stat__value">{workshopStats.rating}</dd>
+					<dt class="stat__label">{workshopStats.ratingLabel}</dt>
 				</div>
 			</dl>
-		</div>
-		<div class="about__master">
-			<div class="about__master-photo" aria-hidden="true">{masterProfile.initials}</div>
-			<p class="about__master-name">{masterProfile.name}</p>
-			<p class="about__master-role">{masterProfile.role}</p>
-			<p class="about__master-promise">«{masterProfile.promise}»</p>
+			<div class="about__master">
+				<span class="about__master-avatar" aria-hidden="true">{masterProfile.initials}</span>
+				<div class="about__master-info">
+					<p class="about__master-name">{masterProfile.name}</p>
+					<p class="about__master-bio">{masterProfile.role}. {masterProfile.promise}</p>
+				</div>
+			</div>
 		</div>
 	</div>
 </section>
@@ -108,12 +138,18 @@
 <!-- ================= Steps ================= -->
 <section class="section steps-section">
 	<div class="container">
-		<Eyebrow>Четыре шага — и снова на связи</Eyebrow>
-		<h2 class="h2 steps-section__title">Как это работает</h2>
+		<div class="steps-head">
+			<h2 class="h2">Как это работает</h2>
+			<p class="steps-head__note">Четыре шага — и снова на связи</p>
+		</div>
 		<ol class="steps">
 			{#each steps as step (step.num)}
 				<li class="step">
-					<span class="step__num">{step.num}</span>
+					<div class="step__top">
+						<span class="step__num">{step.num}</span>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- static inline SVG constants from src/mocks/db.ts, not user input -->
+						<span class="step__icon" aria-hidden="true">{@html step.icon}</span>
+					</div>
 					<h3 class="step__title">{step.title}</h3>
 					<p class="step__text">{step.text}</p>
 				</li>
@@ -125,12 +161,13 @@
 <!-- ================= Reviews ================= -->
 <section class="section reviews-section">
 	<div class="container">
-		<Eyebrow>Нас советуют своим</Eyebrow>
-		<h2 class="h2 reviews-section__title">Отзывы клиентов</h2>
-		<p class="reviews-section__rating">
-			<span class="reviews-section__stars" aria-hidden="true">★★★★★</span>
-			{workshopStats.rating.replace(' /', '')} · {workshopStats.reviewsCount} отзывов на Яндекс ↗
-		</p>
+		<div class="reviews-head">
+			<h2 class="h2">Нас советуют своим</h2>
+			<p class="reviews-head__rating">
+				<span class="reviews-head__stars" aria-hidden="true">★</span>
+				{workshopStats.rating.replace(' / 5', '')} · {workshopStats.reviewsCount} отзывов на Яндекс ↗
+			</p>
+		</div>
 		<div class="reviews">
 			{#each reviews as review (review.id)}
 				<article class="review">
@@ -149,42 +186,14 @@
 	</div>
 </section>
 
-<!-- ================= Map & hours ================= -->
-<section class="section map-section" id="map">
-	<div class="container">
-		<Eyebrow>Как нас найти</Eyebrow>
-		<h2 class="h2 map-section__title">Карта и часы работы</h2>
-		<div class="map-section__grid">
-			<div class="map-frame">
-				<iframe
-					src="https://yandex.ru/map-widget/v1/?text=Самара, проспект Ленина, 12А&z=17"
-					title="Карта: Самара, проспект Ленина, 12А"
-					loading="lazy"
-					allowfullscreen
-				></iframe>
-				<a class="map-frame__fallback" href="https://yandex.ru/maps/?text=Самара, проспект Ленина, 12А" target="_blank" rel="noreferrer">
-					Открыть в Яндекс Картах ↗
-				</a>
-			</div>
-			<div class="hours-card">
-				<p class="hours-card__label">{workshop.hours}</p>
-				<p class="hours-card__status" class:hours-card__status--open={isOpen} class:hours-card__status--closed={!isOpen}>
-					{openStatus}
-				</p>
-				<address class="hours-card__address">{workshop.address}</address>
-				<p class="hours-card__metro">{workshop.metroDistance}</p>
-				<a class="hours-card__phone" href="tel:+74951204567">{workshop.phone}</a>
-			</div>
-		</div>
-	</div>
-</section>
-
 <!-- ================= CTA ================= -->
 <section class="section cta-section">
 	<div class="container cta-section__inner">
-		<h2 class="h2 cta-section__title">Починим телефон.<br />Освободим ваш день.</h2>
-		<p class="cta-section__text">Оставьте заявку — всё остальное возьмём на себя.</p>
-		<Button href="/request" size="lg">Оставить заявку</Button>
+		<div class="cta-section__copy">
+			<h2 class="cta-section__title">Починим телефон. Освободим ваш день.</h2>
+			<p class="cta-section__text">Оставьте заявку — всё остальное возьмём на себя.</p>
+		</div>
+		<Button href="/request" size="lg">Оставить заявку ↗</Button>
 	</div>
 </section>
 
@@ -203,17 +212,23 @@
 	}
 
 	.hero__title {
-		font-size: clamp(34px, 5vw, 64px);
-		font-weight: 600;
-		line-height: 1.08;
-		letter-spacing: -0.02em;
+		font-size: clamp(34px, 4.6vw, 62px);
+		font-weight: 800;
+		line-height: 1.12;
+		letter-spacing: -0.03em;
 		margin: 16px 0 20px;
+		max-width: 620px;
+	}
+
+	.hero__title-accent {
+		color: var(--accent);
 	}
 
 	.hero__subtitle {
-		font-size: 18px;
+		font-size: 17px;
+		line-height: 1.55;
 		color: var(--muted);
-		max-width: 480px;
+		max-width: 440px;
 	}
 
 	.hero__actions {
@@ -230,23 +245,20 @@
 	}
 
 	.trust-item {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		padding: 12px 16px;
-	}
-
-	.trust-item__title {
-		font-size: 13px;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 14px;
 		font-weight: 500;
 	}
 
-	.trust-item__subtitle {
-		font-size: 11px;
-		color: var(--muted);
+	.trust-item__check {
+		color: var(--success);
+		display: inline-flex;
+	}
+
+	.hero__photo {
+		position: relative;
 	}
 
 	.hero__photo img {
@@ -256,12 +268,61 @@
 		border-radius: 20px;
 	}
 
-	.hero__location {
+	.hero__badge {
+		position: absolute;
+		left: -12px;
+		bottom: 24px;
 		display: flex;
 		align-items: center;
+		gap: 12px;
+		background: var(--surface);
+		border-radius: 14px;
+		box-shadow: var(--shadow-card);
+		padding: 14px 18px;
+		max-width: 320px;
+	}
+
+	.hero__badge-icon {
+		width: 40px;
+		height: 40px;
+		border-radius: 10px;
+		background: var(--accent-soft);
+		color: var(--accent);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.hero__badge-title {
+		font-size: 14px;
+		font-weight: 600;
+	}
+
+	.hero__badge-subtitle {
+		font-size: 12px;
+		color: var(--muted);
+		margin-top: 2px;
+	}
+
+	.hero__location {
+		display: grid;
+		grid-template-columns: 1fr 1fr auto;
 		gap: 32px;
-		flex-wrap: wrap;
-		padding-block: 24px 48px;
+		align-items: center;
+		padding-block: 0 48px;
+	}
+
+	.strip-card {
+		grid-column: 1 / -1;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		padding: 20px 28px;
+		display: grid;
+		grid-template-columns: 1fr 1fr auto;
+		gap: 24px;
+		align-items: center;
 	}
 
 	.location {
@@ -313,76 +374,89 @@
 	/* ---------- About ---------- */
 	.about__inner {
 		display: grid;
-		grid-template-columns: 1.5fr 1fr;
-		gap: 56px;
-		align-items: start;
+		grid-template-columns: 1.15fr 1fr;
+		gap: 64px;
+		align-items: center;
 	}
 
 	.about__paragraph {
-		margin-top: 16px;
+		margin-top: 20px;
 		font-size: 15px;
+		line-height: 1.7;
 		color: var(--muted);
-		max-width: 560px;
+		max-width: 520px;
 	}
 
 	.about__stats {
-		display: flex;
-		gap: 48px;
-		margin-top: 32px;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 24px;
+		border-bottom: 1px solid var(--border);
+		padding-bottom: 28px;
 	}
 
 	.stat__value {
-		font-size: 32px;
-		font-weight: 600;
+		font-size: 34px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
 		margin: 0;
+		white-space: nowrap;
 	}
 
 	.stat__label {
-		font-size: 12px;
+		font-size: 13px;
 		color: var(--muted);
-		margin-bottom: 4px;
+		margin-top: 6px;
 	}
 
 	.about__master {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 16px;
-		padding: 32px;
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding-top: 28px;
 	}
 
-	.about__master-photo {
-		width: 56px;
-		height: 56px;
+	.about__master-avatar {
+		width: 48px;
+		height: 48px;
 		border-radius: 50%;
 		background: var(--accent);
 		color: #ffffff;
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 20px;
+		font-size: 17px;
 		font-weight: 600;
-		margin-bottom: 16px;
+		flex-shrink: 0;
 	}
 
 	.about__master-name {
-		font-size: 17px;
+		font-size: 16px;
 		font-weight: 600;
 	}
 
-	.about__master-role {
-		font-size: 13px;
-		color: var(--muted);
-		margin-top: 2px;
-	}
-
-	.about__master-promise {
-		margin-top: 12px;
+	.about__master-bio {
 		font-size: 14px;
+		color: var(--muted);
+		margin-top: 4px;
 	}
 
 	/* ---------- Steps ---------- */
-	.steps-section__title {
-		margin-bottom: 32px;
+	.steps-section {
+		background: var(--bg-muted, var(--bg));
+	}
+
+	.steps-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 24px;
+		margin-bottom: 36px;
+	}
+
+	.steps-head__note {
+		font-size: 14px;
+		color: var(--muted);
 	}
 
 	.steps {
@@ -398,44 +472,63 @@
 		padding: 24px;
 	}
 
+	.step__top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
 	.step__num {
-		font-size: 14px;
+		font-size: 15px;
 		font-weight: 600;
 		color: var(--accent);
+	}
+
+	.step__icon {
+		color: var(--accent);
+		display: inline-flex;
 	}
 
 	.step__title {
 		font-size: 18px;
 		font-weight: 600;
-		margin-top: 12px;
+		margin-top: 16px;
 	}
 
 	.step__text {
 		font-size: 14px;
+		line-height: 1.6;
 		color: var(--muted);
-		margin-top: 8px;
+		margin-top: 10px;
 	}
 
 	/* ---------- Reviews ---------- */
-	.reviews-section__title {
-		margin-bottom: 8px;
+	.reviews-section {
+		background: var(--bg-muted, var(--bg));
 	}
 
-	.reviews-section__rating {
-		font-size: 15px;
-		color: var(--muted);
+	.reviews-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 24px;
+		margin-bottom: 32px;
 	}
 
-	.reviews-section__stars {
-		color: var(--warning);
-		letter-spacing: 2px;
+	.reviews-head__rating {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--accent);
+	}
+
+	.reviews-head__stars {
+		color: var(--accent);
 	}
 
 	.reviews {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		gap: 24px;
-		margin-top: 28px;
 	}
 
 	.review {
@@ -449,30 +542,30 @@
 	}
 
 	.review__stars {
-		color: var(--warning);
-		letter-spacing: 2px;
+		color: #d97706;
+		letter-spacing: 3px;
 		font-size: 15px;
 		margin: 0;
 	}
 
 	.review__text {
 		font-size: 14px;
-		line-height: 1.6;
+		line-height: 1.65;
 	}
 
 	.review__footer {
 		margin-top: auto;
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 12px;
 	}
 
 	.review__avatar {
-		width: 36px;
-		height: 36px;
+		width: 40px;
+		height: 40px;
 		border-radius: 50%;
-		background: var(--accent-soft);
-		color: var(--accent);
+		background: var(--bg-muted, var(--bg));
+		color: var(--muted);
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -495,117 +588,38 @@
 		color: var(--muted);
 	}
 
-	/* ---------- Map ---------- */
-	.map-section__title {
-		margin-bottom: 24px;
-	}
-
-	.map-section__grid {
-		display: grid;
-		grid-template-columns: 1.6fr 1fr;
-		gap: 24px;
-	}
-
-	.map-frame {
-		position: relative;
-		border-radius: 16px;
-		overflow: hidden;
-		border: 1px solid var(--border);
-		min-height: 360px;
-	}
-
-	.map-frame iframe {
-		width: 100%;
-		height: 100%;
-		min-height: 360px;
-		border: 0;
-	}
-
-	.map-frame__fallback {
-		position: absolute;
-		left: 16px;
-		bottom: 16px;
-		background: var(--surface);
-		border-radius: 12px;
-		box-shadow: var(--shadow-card);
-		padding: 10px 16px;
-		font-size: 13px;
-		font-weight: 500;
-		color: var(--accent);
-	}
-
-	.hours-card {
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 16px;
-		padding: 28px;
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-
-	.hours-card__label {
-		font-size: 17px;
-		font-weight: 600;
-	}
-
-	.hours-card__status {
-		font-size: 14px;
-	}
-
-	.hours-card__status--open {
-		color: var(--success);
-	}
-
-	.hours-card__status--closed {
-		color: var(--warning);
-	}
-
-	.hours-card__address {
-		font-style: normal;
-		font-size: 14px;
-	}
-
-	.hours-card__metro {
-		font-size: 13px;
-		color: var(--muted);
-	}
-
-	.hours-card__phone {
-		font-size: 16px;
-		font-weight: 500;
-		margin-top: 8px;
-	}
-
 	/* ---------- CTA ---------- */
 	.cta-section {
-		padding-block: 40px;
+		padding-block: 40px 72px;
 	}
 
 	.cta-section__inner {
 		background: var(--accent);
 		color: #ffffff;
 		border-radius: 24px;
-		padding: 56px 64px;
+		padding: 48px 56px;
 		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 12px;
+		align-items: center;
+		justify-content: space-between;
+		gap: 32px;
 	}
 
 	.cta-section__title {
-		font-size: clamp(28px, 3.4vw, 40px);
+		font-size: clamp(26px, 3vw, 38px);
+		font-weight: 700;
+		letter-spacing: -0.02em;
 	}
 
 	.cta-section__text {
-		font-size: 16px;
-		opacity: 0.9;
-		margin-bottom: 16px;
+		font-size: 15px;
+		opacity: 0.85;
+		margin-top: 10px;
 	}
 
 	.cta-section :global(.btn--primary) {
 		background: #ffffff;
 		color: var(--accent);
+		flex-shrink: 0;
 	}
 
 	.cta-section :global(.btn--primary:hover) {
@@ -623,13 +637,24 @@
 		}
 
 		.about__inner,
-		.hero__inner,
-		.map-section__grid {
+		.hero__inner {
 			grid-template-columns: 1fr;
 		}
 
 		.hero__photo {
 			display: none;
+		}
+
+		.strip-card {
+			grid-template-columns: 1fr;
+			gap: 18px;
+		}
+
+		.steps-head,
+		.reviews-head {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 8px;
 		}
 	}
 
@@ -647,13 +672,14 @@
 			grid-template-columns: 1fr;
 		}
 
-		.about__stats {
-			gap: 24px;
-			flex-wrap: wrap;
-		}
-
 		.cta-section__inner {
 			padding: 32px 24px;
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.hero__title br {
+			display: none;
 		}
 	}
 </style>

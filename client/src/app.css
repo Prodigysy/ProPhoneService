@@ -20,6 +20,7 @@
 /* ---------- Theme tokens: light (default) ---------- */
 :root {
 	--bg: #f0f2f5;
+	--bg-muted: #e9edf3;
 	--surface: #ffffff;
 	--text: #171c28;
 	--muted: #697181;
@@ -42,6 +43,7 @@
 /* ---------- Theme tokens: dark ---------- */
 :root[data-theme='dark'] {
 	--bg: #101319;
+	--bg-muted: #151a22;
 	--surface: #191e27;
 	--text: #f2f4f8;
 	--muted: #a0abbd;
@@ -64,6 +66,7 @@
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme]) {
 		--bg: #101319;
+		--bg-muted: #151a22;
 		--surface: #191e27;
 		--text: #f2f4f8;
 		--muted: #a0abbd;

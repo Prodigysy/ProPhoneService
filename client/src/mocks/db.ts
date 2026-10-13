@@ -215,7 +215,7 @@ export const workshopStats = {
 	yearsLabel: 'чиним телефоны',
 	saved: '4 800+',
 	savedLabel: 'устройств спасено',
-	rating: '4,9 /',
+	rating: '4,9 / 5',
 	ratingLabel: 'оценка на Яндекс',
 	reviewsCount: '218'
 };
@@ -231,29 +231,37 @@ export const aboutText =
 	'С 2018 года помогаем соседям на Покровке оставаться на связи. Объясняем поломку простыми словами, бережём ваши данные и не начинаем ремонт без согласования цены.';
 
 export const heroTrust = [
-	{ title: 'В надёжных руках', subtitle: 'Ремонтируем, а не усложняем' },
 	{ title: 'Диагностика — 0 ₽', subtitle: null },
 	{ title: 'Гарантия 90 дней', subtitle: null }
 ];
 
+export const heroBadge = {
+	title: 'В надёжных руках',
+	subtitle: 'Ремонтируем, а не усложняем'
+};
+
 export const steps = [
 	{
 		num: '01',
+		icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v11H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
 		title: 'Расскажите о поломке',
 		text: 'Выберите устройство и проблему. Заявка займёт всего пару минут.'
 	},
 	{
 		num: '02',
+		icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>',
 		title: 'Принесите телефон',
 		text: 'Проведём диагностику и согласуем точную цену до начала ремонта.'
 	},
 	{
 		num: '03',
+		icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14.5 6.5a3.5 3.5 0 0 1 4.9-4.3l-2.6 2.6 2.4 2.4L21.8 4.6a3.5 3.5 0 0 1-4.9 4.9L8 18.4a2 2 0 1 1-2.8-2.8l9.3-9.1Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
 		title: 'Мы всё исправим',
 		text: 'Мастер займётся устройством. Следите за этапами ремонта онлайн.'
 	},
 	{
 		num: '04',
+		icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="m8.5 12.2 2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 		title: 'Заберите как новый',
 		text: 'Проверим телефон вместе с вами и выдадим гарантию на 90 дней.'
 	}
