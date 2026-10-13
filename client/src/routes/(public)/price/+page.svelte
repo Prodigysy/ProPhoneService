@@ -2,10 +2,14 @@
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import { priceRows, priceUpdatedAt } from '../../../mocks/db.ts';
+	import { fetchServices, isMockMode, type ServiceDto } from '../../../services/api.ts';
 
 	type Category = 'all' | 'apple' | 'samsung' | 'xiaomi';
 
 	let category = $state<Category>('all');
+	let services = $state<ServiceDto[]>([]);
+	let servicesLoading = $state(!isMockMode);
+	let servicesError = $state(false);
 
 	const filters: { id: Category; label: string }[] = [
 		{ id: 'all', label: 'Все устройства' },
@@ -16,6 +20,16 @@
 
 	const priceFormat = new Intl.NumberFormat('ru-RU');
 
+	$effect(() => {
+		if (isMockMode) return;
+		fetchServices()
+			.then((items) => {
+				services = items;
+				servicesError = false;
+			})
+			.catch(() => (servicesError = true))
+			.finally(() => (servicesLoading = false));
+	});
 
 	function priceFor(row: (typeof priceRows)[number], key: Exclude<Category, 'all'>): string {
 		const value = row[key];
@@ -28,91 +42,103 @@
 	<Eyebrow>Понятно до ремонта</Eyebrow>
 	<h1 class="h2 heading">Хороший ремонт. Честная цена.</h1>
 	<p class="lead">
-		Популярные работы и ориентировочная стоимость. Запчасти и работа мастера уже включены.
+		{isMockMode
+			? 'Популярные работы и ориентировочная стоимость. Запчасти и работа мастера уже включены.'
+			: 'Активные услуги и цены из базы мастерской. Итоговая стоимость подтверждается после диагностики.'}
 	</p>
 
 	<div class="toolbar">
-		<div class="filters" role="group" aria-label="Фильтр по производителю">
-			{#each filters as filter (filter.id)}
-				<button
-					class="filter"
-					class:filter--active={category === filter.id}
-					aria-pressed={category === filter.id}
-					onclick={() => (category = filter.id)}
-				>
-					{filter.label}
-				</button>
-			{/each}
-		</div>
-		<p class="updated">Цены обновлены {priceUpdatedAt}</p>
+		{#if isMockMode}
+			<div class="filters" role="group" aria-label="Фильтр по производителю">
+				{#each filters as filter (filter.id)}
+					<button
+						class="filter"
+						class:filter--active={category === filter.id}
+						aria-pressed={category === filter.id}
+						onclick={() => (category = filter.id)}
+					>
+						{filter.label}
+					</button>
+				{/each}
+			</div>
+		{/if}
+		<p class="updated">{isMockMode ? `Цены обновлены ${priceUpdatedAt}` : 'Актуальные цены из прайс-листа мастерской'}</p>
 	</div>
 
-	<!-- Desktop: table -->
-	<div class="table-wrap" aria-hidden="false">
+	{#if !isMockMode && servicesError}
+		<p class="load-error" role="alert">Не удалось загрузить прайс. Проверьте подключение к API и обновите страницу.</p>
+	{/if}
+	{#if !isMockMode && servicesLoading}
+		<p class="service-loading" role="status">Загружаем актуальный прайс…</p>
+	{/if}
+
+	<!-- Desktop: model comparison in mock mode, actual service DTOs in API mode. -->
+	<div class="table-wrap">
 		<table class="price-table">
-			<thead>
-				<tr>
-					<th scope="col">Тип ремонта</th>
-					<th scope="col">iPhone 11–15</th>
-					<th scope="col">Samsung Galaxy</th>
-					<th scope="col">Xiaomi / Redmi</th>
-					<th scope="col">Срок</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each priceRows as row (row.id)}
-					<tr>
-						<td>
-							<span class="row-name">{row.name}</span>
-							<span class="row-desc">{row.description}</span>
-						</td>
-						<td class="price">{priceFor(row, 'apple')}</td>
-						<td class="price">{priceFor(row, 'samsung')}</td>
-						<td class="price">{priceFor(row, 'xiaomi')}</td>
-						<td class="duration">{row.duration}</td>
-					</tr>
-				{/each}
-			</tbody>
+			{#if isMockMode}
+				<thead>
+					<tr><th scope="col">Тип ремонта</th><th scope="col">iPhone 11–15</th><th scope="col">Samsung Galaxy</th><th scope="col">Xiaomi / Redmi</th><th scope="col">Срок</th></tr>
+				</thead>
+				<tbody>
+					{#each priceRows as row (row.id)}
+						<tr>
+							<td><span class="row-name">{row.name}</span><span class="row-desc">{row.description}</span></td>
+							<td class="price">{priceFor(row, 'apple')}</td>
+							<td class="price">{priceFor(row, 'samsung')}</td>
+							<td class="price">{priceFor(row, 'xiaomi')}</td>
+							<td class="duration">{row.duration}</td>
+						</tr>
+					{/each}
+				</tbody>
+			{:else}
+				<thead><tr><th scope="col">Услуга</th><th scope="col">Описание</th><th scope="col">Цена</th></tr></thead>
+				<tbody>
+					{#each services as service (service.id)}
+						<tr>
+							<td><span class="row-name">{service.name}</span></td>
+							<td class="row-desc">{service.description ?? 'Описание не указано'}</td>
+							<td class="price">{service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</td>
+						</tr>
+					{:else}
+						<tr><td colspan="3" class="duration">Активных услуг пока нет.</td></tr>
+					{/each}
+				</tbody>
+			{/if}
 		</table>
 	</div>
 
-	<!-- Mobile: cards -->
+	<!-- Mobile cards -->
 	<div class="cards">
-		{#each priceRows as row (row.id)}
-			<article class="card">
-				<header class="card__head">
-					<h2 class="card__name">{row.name}</h2>
-					<p class="card__desc">{row.description}</p>
-				</header>
-				{#if category === 'all'}
-					<dl class="card__prices">
-						<div>
-							<dt>iPhone 11–15</dt>
-							<dd>{priceFor(row, 'apple')}</dd>
-						</div>
-						<div>
-							<dt>Samsung Galaxy</dt>
-							<dd>{priceFor(row, 'samsung')}</dd>
-						</div>
-						<div>
-							<dt>Xiaomi / Redmi</dt>
-							<dd>{priceFor(row, 'xiaomi')}</dd>
-						</div>
-					</dl>
-				{:else}
-					<p class="card__single-price">
-						{priceFor(row, category)}
-					</p>
-				{/if}
-				<p class="card__duration">Срок: {row.duration}</p>
-			</article>
-		{/each}
+		{#if isMockMode}
+			{#each priceRows as row (row.id)}
+				<article class="card">
+					<header class="card__head"><h2 class="card__name">{row.name}</h2><p class="card__desc">{row.description}</p></header>
+					{#if category === 'all'}
+						<dl class="card__prices">
+							<div><dt>iPhone 11–15</dt><dd>{priceFor(row, 'apple')}</dd></div>
+							<div><dt>Samsung Galaxy</dt><dd>{priceFor(row, 'samsung')}</dd></div>
+							<div><dt>Xiaomi / Redmi</dt><dd>{priceFor(row, 'xiaomi')}</dd></div>
+						</dl>
+					{:else}<p class="card__single-price">{priceFor(row, category)}</p>{/if}
+					<p class="card__duration">Срок: {row.duration}</p>
+				</article>
+			{/each}
+		{:else}
+			{#each services as service (service.id)}
+				<article class="card">
+					<header class="card__head"><h2 class="card__name">{service.name}</h2><p class="card__desc">{service.description ?? 'Описание не указано'}</p></header>
+					<p class="card__single-price">{service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</p>
+					<p class="card__duration">Итог подтвердим после диагностики.</p>
+				</article>
+			{:else}<p class="card__desc">Активных услуг пока нет.</p>{/each}
+		{/if}
 	</div>
 
 	<div class="note" role="note">
-		<strong>Это ориентир, а не окончательный счёт.</strong>
-		Цена зависит от модели и сложности поломки. Точную стоимость подтвердим после бесплатной
-		диагностики и согласуем с вами. Никаких дополнительных работ без вашего согласия.
+		<strong>{isMockMode ? 'Это ориентир, а не окончательный счёт.' : 'Окончательную стоимость подтвердит мастер.'}</strong>
+		{isMockMode
+			? ' Цена зависит от модели и сложности поломки. Точную стоимость подтвердим после бесплатной диагностики и согласуем с вами. Никаких дополнительных работ без вашего согласия.'
+			: ' Цена в списке — цена услуги из базы. Не начинаем дополнительные работы без согласия клиента.'}
 	</div>
 
 	<div class="cta">
@@ -174,6 +200,17 @@
 	.updated {
 		font-size: 12px;
 		color: var(--muted);
+	}
+
+	.service-loading,
+	.load-error {
+		margin-top: 16px;
+		font-size: 14px;
+		color: var(--muted);
+	}
+
+	.load-error {
+		color: var(--danger);
 	}
 
 	/* ---------- Desktop table ---------- */
