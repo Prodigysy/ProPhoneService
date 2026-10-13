@@ -119,7 +119,7 @@ copy .env.example .env   # Windows PowerShell; use cp on POSIX
 npm run dev
 ```
 
-The backend branch currently does not persist `ProblemDescription` and its order-list DTO omits client name, services, price, and a human-readable order number. The frontend sends `problemDescription` for the agreed backend contract and displays only fields the current API returns; the backend owner must add persistence before issue descriptions are stored. For production, host the static frontend and proxy `/api` to the backend on the same origin; the backend branch does not configure CORS.
+The backend branch currently exposes no client, service or price data in its order list DTO, so the master panel shows only the fields it returns and renders placeholders for monthly revenue and clients. For production, host the static frontend and proxy `/api` to the backend on the same origin; the backend branch does not configure CORS.
 
 ```bash
 npm run lint
