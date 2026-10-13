@@ -182,7 +182,7 @@
 			<input
 				class="search__input"
 				type="search"
-				placeholder={isMockMode ? 'Номер заявки, клиент или устройство' : 'ID заявки или устройство'}
+				placeholder={isMockMode ? 'Номер заявки, клиент или устройство' : 'Имя клиента или устройство'}
 				aria-label="Поиск по заявкам"
 				bind:value={query}
 			/>
@@ -227,7 +227,7 @@
 							</tr>
 						{:else}
 							<tr>
-								<th scope="col">ID заявки</th><th scope="col">Устройство</th><th scope="col">Желаемый визит</th><th scope="col">Создана</th><th scope="col">Статус</th>
+								<th scope="col">Клиент</th><th scope="col">Устройство</th><th scope="col">Желаемый визит</th><th scope="col">Создана</th><th scope="col">Статус</th>
 							</tr>
 						{/if}
 					</thead>
@@ -243,7 +243,7 @@
 									<td><StatusSelect status={order.status} disabled={changing !== null} onchange={(next) => onStatusChange(order, next)} /></td>
 									<td class="row__date">{formatDate(order.createdAt)}</td>
 								{:else}
-									<td><span class="row__number" title={order.id}>{displayReference(order)}</span></td>
+									<td class="row__client">{order.clientName ?? '—'}</td>
 									<td class="row__device">{order.deviceName}</td>
 									<td class="row__date">{order.preferredVisitAt ? formatVisit(order.preferredVisitAt) : '—'}</td>
 									<td class="row__date">{formatDate(order.createdAt)}</td>
@@ -260,7 +260,7 @@
 				{#each pageOrders as order (order.id)}
 					<li class="card">
 						<div class="card__head">
-							<span class="card__number" title={order.id}>{displayReference(order)}</span>
+							<span class="card__number" title={isMockMode ? order.id : undefined}>{isMockMode ? displayReference(order) : (order.clientName ?? 'Клиент без имени')}</span>
 							<span class="card__date">{formatDate(order.createdAt)}</span>
 						</div>
 						<p class="card__device">{order.deviceName}</p>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import type { RepairOrderDto } from '../../../../services/api.ts';
@@ -49,8 +48,7 @@
 				</svg>
 			</div>
 
-			<Eyebrow>Заявка отправлена</Eyebrow>
-			<h1 class="h2 title">Заявка принята</h1>
+			<h1 class="title">Заявка принята</h1>
 
 			<p class="text">
 				Мы сохранили заявку. Мастер проведёт бесплатную диагностику и подтвердит стоимость.
@@ -120,6 +118,8 @@
 	}
 
 	.title {
+		font-size: 22px;
+		font-weight: 600;
 		margin-bottom: 8px;
 	}
 

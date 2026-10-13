@@ -319,6 +319,12 @@ interface BackendOrderDto {
 	statusTimeline: RepairStatusHistoryDto[];
 }
 
+/** GET /orders/{id} response — the list DTO omits the client, the detail one has it. */
+interface BackendOrderDetailDto extends BackendOrderDto {
+	client: { id: string; name: string; phone: string; email: string | null } | null;
+	totalPrice: number | null;
+}
+
 interface BackendCreateOrderResponse {
 	id: string;
 }
@@ -381,6 +387,19 @@ export async function fetchOrders(): Promise<RepairOrderDto[]> {
 		result.push(...items.map(asFrontendOrder));
 		if (items.length < apiPageSize) break;
 	}
+
+	// The list DTO carries no client; the detail endpoint does. Warm the names
+	// for the loaded rows; a failed detail fetch just keeps the client empty.
+	await Promise.all(
+		result.map(async (order) => {
+			try {
+				const detail = await request<BackendOrderDetailDto>(`/orders/${order.id}`);
+				order.clientName = detail.client?.name ?? null;
+			} catch {
+				// leave clientName as-is
+			}
+		})
+	);
 	return result;
 }
 
