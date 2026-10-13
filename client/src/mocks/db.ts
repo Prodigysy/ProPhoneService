@@ -1,9 +1,11 @@
-// Deterministic mock data mirroring the Figma/PDF mockup (docs/Макет.pdf).
+// Deterministic mock data mirroring the V2 mockup (docs/Макет.V2.pdf).
 // Used by src/services/api.ts when VITE_API_URL is not set.
 
 export interface WorkshopInfo {
 	name: string;
 	address: string;
+	/** Street and building only, for copy such as "Приносите телефон на …". */
+	addressShort: string;
 	metro: string;
 	metroDistance: string;
 	phone: string;
@@ -19,9 +21,10 @@ export interface WorkshopInfo {
 
 export const workshop: WorkshopInfo = {
 	name: 'про телефон',
-	address: 'Москва, ул. Покровка, 17',
-	metro: 'Чистые пруды',
-	metroDistance: '7 минут от метро «Чистые пруды»',
+	address: 'Самара, просп. Ленина, 12А',
+	addressShort: 'проспект Ленина, 12А',
+	metro: 'Алабинская',
+	metroDistance: '5 минут от метро «Алабинская»',
 	phone: '+7 (495) 120-45-67',
 	hours: 'Пн–Пт · 10:00–19:00',
 	timeZone: 'Europe/Samara',
@@ -129,100 +132,51 @@ export const devices: DeviceModel[] = [
 
 export const CUSTOM_DEVICE = 'custom';
 
-export interface PriceRow {
-	id: string;
+export interface ServiceMeta {
 	name: string;
+	/** Short label from the mockup ("Диагностика" instead of the API's long name). */
+	displayName: string;
 	description: string;
-	apple: number | null; // null = free
-	samsung: number | null;
-	xiaomi: number | null;
 	duration: string;
 }
 
-export const priceRows: PriceRow[] = [
-	{
-		id: 'display',
-		name: 'Замена дисплея',
-		description: 'Изображение, сенсор и стекло',
-		apple: 9900,
-		samsung: 6900,
-		xiaomi: 4490,
-		duration: '2–4 часа'
-	},
-	{
-		id: 'battery',
-		name: 'Замена аккумулятора',
-		description: 'Быстро разряжается или выключается',
-		apple: 3490,
-		samsung: 2990,
-		xiaomi: 2490,
-		duration: 'от 40 мин'
-	},
-	{
-		id: 'charging-port',
-		name: 'Разъём зарядки',
-		description: 'Не заряжается или отходит кабель',
-		apple: 3490,
-		samsung: 2490,
-		xiaomi: 2490,
-		duration: '1–2 часа'
-	},
-	{
-		id: 'back-glass',
-		name: 'Замена заднего стекла',
-		description: 'Трещины и повреждения корпуса',
-		apple: 5900,
-		samsung: 3490,
-		xiaomi: 2490,
-		duration: '2–3 часа'
-	},
-	{
-		id: 'camera',
-		name: 'Ремонт камеры',
-		description: 'Не фокусируется или не снимает',
-		apple: 4490,
-		samsung: 3490,
-		xiaomi: 2990,
-		duration: '1–2 часа'
-	},
-	{
-		id: 'water',
-		name: 'После попадания воды',
-		description: 'Чистка и восстановление устройства',
-		apple: 2990,
-		samsung: 2990,
-		xiaomi: 2490,
-		duration: 'от 1 дня'
-	},
-	{
-		id: 'diagnostics',
-		name: 'Диагностика',
-		description: 'Найдём причину неисправности',
-		apple: null,
-		samsung: null,
-		xiaomi: null,
-		duration: 'от 20 мин'
-	}
+/**
+ * V2 mockup metadata for the seeded services: display order, duration and the
+ * short description of the price list. The API returns only name and price, so
+ * this reference table fills the remaining columns of the layout.
+ */
+export const serviceCatalog: ServiceMeta[] = [
+	{ name: 'Диагностика (выявление неисправности)', displayName: 'Диагностика', description: 'Найдём причину неисправности', duration: 'от 20 мин' },
+	{ name: 'Замена дисплейного модуля', displayName: 'Замена дисплейного модуля', description: 'Изображение, сенсор и стекло', duration: '2–4 часа' },
+	{ name: 'Замена разъема зарядки', displayName: 'Замена разъема зарядки', description: 'Не заряжается или отходит кабель', duration: '1–2 часа' },
+	{ name: 'Замена аккумулятора', displayName: 'Замена аккумулятора', description: 'Быстро разряжается или выключается', duration: 'от 40 мин' },
+	{ name: 'Замена микрофона', displayName: 'Замена микрофона', description: 'Плохая слышимость во время звонков', duration: '1–2 часа' },
+	{ name: 'Замена динамика', displayName: 'Замена динамика', description: 'Не слышно звука или есть помехи', duration: '1–2 часа' },
+	{ name: 'Замена кнопки', displayName: 'Замена кнопки', description: 'Не нажимается или застряла', duration: '1–2 часа' },
+	{ name: 'Замена камеры', displayName: 'Замена камеры', description: 'Не фокусируется или не снимает', duration: '1–2 часа' },
+	{ name: 'Профилактика', displayName: 'Профилактика', description: 'Проверка и подготовка устройства', duration: 'от 30 мин' },
+	{ name: 'Чистка сеток и разъемов', displayName: 'Чистка сеток и разъемов', description: 'Удаление пыли и мусора', duration: 'от 20 мин' }
 ];
 
-export const priceUpdatedAt = '1 октября 2026';
-
-export interface ProblemOption {
-	id: string;
-	label: string;
-	serviceId: string | null;
-	partsPrice: number; // запчасть
-	workPrice: number; // работа мастера
+/** Catalog entry for a service name, with a neutral fallback for unknown services. */
+export function serviceMeta(name: string): ServiceMeta {
+	return (
+		serviceCatalog.find((item) => item.name.toLowerCase() === name.toLowerCase()) ?? {
+			name,
+			displayName: name,
+			description: 'Описание уточним после диагностики',
+			duration: 'уточним после диагностики'
+		}
+	);
 }
 
-export const problems: ProblemOption[] = [
-	{ id: 'battery', label: 'Быстро разряжается · замена аккумулятора', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e04', partsPrice: 2490, workPrice: 1000 },
-	{ id: 'screen', label: 'Разбит экран', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e02', partsPrice: 3490, workPrice: 1500 },
-	{ id: 'charging', label: 'Не заряжается', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e03', partsPrice: 1490, workPrice: 1000 },
-	{ id: 'water', label: 'Попала вода', serviceId: null, partsPrice: 990, workPrice: 2000 },
-	{ id: 'camera', label: 'Камера не фокусируется', serviceId: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e08', partsPrice: 2490, workPrice: 1000 },
-	{ id: 'other', label: 'Другая проблема', serviceId: null, partsPrice: 0, workPrice: 0 }
-];
+/** Catalog position of a service, used to keep the mockup's row order. */
+export function serviceOrderIndex(name: string): number {
+	const index = serviceCatalog.findIndex((item) => item.name.toLowerCase() === name.toLowerCase());
+	return index === -1 ? serviceCatalog.length : index;
+}
+
+export const priceUpdatedAt = '1 октября 2026';
 
 export interface ReviewItem {
 	id: string;

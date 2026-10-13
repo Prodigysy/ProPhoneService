@@ -5,10 +5,10 @@
 // API contracts are based on Darowiin/ProPhoneService feat/backend-foundation:
 //   GET /api/orders?page=N, POST /api/orders, PATCH /api/orders/{id}/status
 //   GET /api/services
-// The create DTO's ProblemDescription is agreed with the backend owner but is
-// not present on that branch yet; its persistence requires a backend update.
+// Order creation sends name, contact, device, visit time and the selected
+// service ids; the API computes the total price from those ids.
 
-import { workshop } from '../mocks/db.ts';
+import { serviceMeta, workshop } from '../mocks/db.ts';
 
 export type RepairStatus =
 	| 'Created'
@@ -47,19 +47,19 @@ export interface ServiceDto {
 	description: string | null;
 }
 
-/** Mirrors POST /api/orders. problemDescription is pending the backend owner's DTO/storage change. */
+/**
+ * Mirrors POST /api/orders. Phone or email is required by the backend, so exactly
+ * one of them carries the value the client typed into the single contact field.
+ */
 export interface CreateOrderPayload {
 	name: string;
-	phone: string;
+	phone: string | null;
 	email: string | null;
 	deviceType: 'Phone' | 'Tablet' | 'Laptop';
 	deviceManufacturer: string;
 	deviceModel: string;
 	preferredVisitAt: string;
 	serviceIds: string[];
-	problemDescription: string;
-	/** Local mock-only total; the API calculates price from ServiceIds. */
-	estimateTotal?: number;
 }
 
 export interface CreateOrderResult {
@@ -415,8 +415,8 @@ export async function createOrder(payload: CreateOrderPayload): Promise<CreateOr
 			number,
 			clientName: payload.name,
 			deviceName: `${payload.deviceManufacturer} ${payload.deviceModel}`.trim(),
-			serviceName: selectedServices.map((service) => service.name).join(', ') || 'Диагностика',
-			price: payload.estimateTotal ?? selectedServices.reduce((sum, service) => sum + service.price, 0),
+			serviceName: selectedServices.map((service) => serviceMeta(service.name).displayName).join(', ') || 'Диагностика',
+			price: selectedServices.reduce((sum, service) => sum + service.price, 0),
 			priceFrom: false,
 			status: 'Created',
 			createdAt: new Date().toISOString(),
@@ -435,8 +435,7 @@ export async function createOrder(payload: CreateOrderPayload): Promise<CreateOr
 			deviceManufacturer: payload.deviceManufacturer,
 			deviceModel: payload.deviceModel,
 			preferredVisitAt: payload.preferredVisitAt,
-			serviceIds: payload.serviceIds,
-			problemDescription: payload.problemDescription
+			serviceIds: payload.serviceIds
 		})
 	});
 	return { id: result.id, number: result.id, status: 'Created' };

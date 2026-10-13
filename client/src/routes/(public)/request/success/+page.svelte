@@ -8,15 +8,13 @@
 	import { fetchOrderById } from '../../../../services/api.ts';
 	import { workshop } from '../../../../mocks/db.ts';
 
-	// The current API uses the returned Guid as its order identifier.
-	const number = $derived(page.url.searchParams.get('number') ?? '');
-	const orderId = $derived(page.url.searchParams.get('id') ?? number);
+	// The identifier stays internal: the client sees the recap, not the order id.
+	const orderId = $derived(page.url.searchParams.get('id') ?? '');
 	const device = $derived(page.url.searchParams.get('device') ?? '');
-	const problem = $derived(page.url.searchParams.get('problem') ?? '');
+	const services = $derived(page.url.searchParams.get('services') ?? '');
 	const price = $derived(page.url.searchParams.get('price') ?? '—');
 	const date = $derived(page.url.searchParams.get('date') ?? '');
 	const time = $derived(page.url.searchParams.get('time') ?? '');
-	const isGuid = $derived(/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(number));
 
 	let order = $state<RepairOrderDto | null>(null);
 	let notFound = $state(false);
@@ -42,7 +40,7 @@
 	);
 </script>
 
-{#if number}
+{#if orderId}
 	<section class="container section success">
 		<div class="card">
 			<div class="check" aria-hidden="true">
@@ -52,10 +50,7 @@
 			</div>
 
 			<Eyebrow>Заявка отправлена</Eyebrow>
-			<h1 class="h2 title">{isGuid ? 'Заявка принята' : `Заявка № ${number} принята`}</h1>
-			<p class="number" aria-label={isGuid ? 'ID заявки' : 'Номер заявки'}>
-				{isGuid ? `ID: ${number}` : number}
-			</p>
+			<h1 class="h2 title">Заявка принята</h1>
 
 			<p class="text">
 				Мы сохранили заявку. Мастер проведёт бесплатную диагностику и подтвердит стоимость.
@@ -66,15 +61,15 @@
 				{#if device}
 					<div><dt>Устройство</dt><dd>{device}</dd></div>
 				{/if}
-				{#if problem}
-					<div><dt>Услуга</dt><dd>{problem}</dd></div>
+				{#if services}
+					<div><dt>Услуги</dt><dd>{services}</dd></div>
 				{/if}
 				{#if dateFormatted}
 					<div><dt>Дата визита</dt><dd>{dateFormatted}{time ? `, ${time}` : ''}</dd></div>
 				{/if}
 				<div>
 					<dt>Ориентировочная цена</dt>
-					<dd>{price === '—' ? 'Уточнит мастер' : `${price} ₽`}</dd>
+					<dd>{price === '—' ? 'Уточнит мастер' : `от ${price} ₽`}</dd>
 				</div>
 			</dl>
 
@@ -90,8 +85,7 @@
 			</div>
 
 			<div class="actions">
-				<Button href="/" variant="secondary">На главную</Button>
-				<Button href="/price">Посмотреть цены</Button>
+				<Button href="/">На главную</Button>
 			</div>
 		</div>
 	</section>
@@ -127,14 +121,6 @@
 
 	.title {
 		margin-bottom: 8px;
-	}
-
-	.number {
-		font-size: 44px;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		color: var(--accent);
-		margin-bottom: 16px;
 	}
 
 	.text {
@@ -203,10 +189,6 @@
 	@media (max-width: 600px) {
 		.card {
 			padding: 28px 20px;
-		}
-
-		.number {
-			font-size: 34px;
 		}
 	}
 </style>

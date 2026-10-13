@@ -1,40 +1,32 @@
 <script lang="ts">
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
-	import { priceRows, priceUpdatedAt } from '../../../mocks/db.ts';
-	import { fetchServices, isMockMode, type ServiceDto } from '../../../services/api.ts';
+	import { priceUpdatedAt, serviceMeta, serviceOrderIndex } from '../../../mocks/db.ts';
+	import { fetchServices, type ServiceDto } from '../../../services/api.ts';
 
-	type Category = 'all' | 'apple' | 'samsung' | 'xiaomi';
-
-	let category = $state<Category>('all');
 	let services = $state<ServiceDto[]>([]);
-	let servicesLoading = $state(!isMockMode);
-	let servicesError = $state(false);
-
-	const filters: { id: Category; label: string }[] = [
-		{ id: 'all', label: 'Все устройства' },
-		{ id: 'apple', label: 'Apple' },
-		{ id: 'samsung', label: 'Samsung' },
-		{ id: 'xiaomi', label: 'Xiaomi / Redmi' }
-	];
+	let loading = $state(true);
+	let failed = $state(false);
 
 	const priceFormat = new Intl.NumberFormat('ru-RU');
 
+	// The API returns services in database order; the mockup defines this order.
+	const rows = $derived(
+		[...services].sort((a, b) => serviceOrderIndex(a.name) - serviceOrderIndex(b.name))
+	);
+
 	$effect(() => {
-		if (isMockMode) return;
 		fetchServices()
 			.then((items) => {
 				services = items;
-				servicesError = false;
+				failed = false;
 			})
-			.catch(() => (servicesError = true))
-			.finally(() => (servicesLoading = false));
+			.catch(() => (failed = true))
+			.finally(() => (loading = false));
 	});
 
-	function priceFor(row: (typeof priceRows)[number], key: Exclude<Category, 'all'>): string {
-		const value = row[key];
-		if (value === null) return 'Бесплатно';
-		return `от ${priceFormat.format(value)} ₽`;
+	function priceText(price: number): string {
+		return price === 0 ? 'Бесплатно' : `от ${priceFormat.format(price)} ₽`;
 	}
 </script>
 
@@ -42,103 +34,75 @@
 	<Eyebrow>Понятно до ремонта</Eyebrow>
 	<h1 class="h2 heading">Хороший ремонт. Честная цена.</h1>
 	<p class="lead">
-		{isMockMode
-			? 'Популярные работы и ориентировочная стоимость. Запчасти и работа мастера уже включены.'
-			: 'Активные услуги и цены из базы мастерской. Итоговая стоимость подтверждается после диагностики.'}
+		Популярные работы и ориентировочная стоимость. Запчасти и работа мастера уже включены.
 	</p>
 
 	<div class="toolbar">
-		{#if isMockMode}
-			<div class="filters" role="group" aria-label="Фильтр по производителю">
-				{#each filters as filter (filter.id)}
-					<button
-						class="filter"
-						class:filter--active={category === filter.id}
-						aria-pressed={category === filter.id}
-						onclick={() => (category = filter.id)}
-					>
-						{filter.label}
-					</button>
-				{/each}
-			</div>
-		{/if}
-		<p class="updated">{isMockMode ? `Цены обновлены ${priceUpdatedAt}` : 'Актуальные цены из прайс-листа мастерской'}</p>
+		<span class="filter filter--active">Общий прайс</span>
+		<p class="updated">Цены обновлены {priceUpdatedAt}</p>
 	</div>
 
-	{#if !isMockMode && servicesError}
-		<p class="load-error" role="alert">Не удалось загрузить прайс. Проверьте подключение к API и обновите страницу.</p>
-	{/if}
-	{#if !isMockMode && servicesLoading}
-		<p class="service-loading" role="status">Загружаем актуальный прайс…</p>
+	{#if failed}
+		<p class="load-error" role="alert">
+			Не удалось загрузить прайс. Проверьте подключение к API и обновите страницу.
+		</p>
 	{/if}
 
-	<!-- Desktop: model comparison in mock mode, actual service DTOs in API mode. -->
+	<!-- Desktop: one row per service -->
 	<div class="table-wrap">
 		<table class="price-table">
-			{#if isMockMode}
-				<thead>
-					<tr><th scope="col">Тип ремонта</th><th scope="col">iPhone 11–15</th><th scope="col">Samsung Galaxy</th><th scope="col">Xiaomi / Redmi</th><th scope="col">Срок</th></tr>
-				</thead>
-				<tbody>
-					{#each priceRows as row (row.id)}
-						<tr>
-							<td><span class="row-name">{row.name}</span><span class="row-desc">{row.description}</span></td>
-							<td class="price">{priceFor(row, 'apple')}</td>
-							<td class="price">{priceFor(row, 'samsung')}</td>
-							<td class="price">{priceFor(row, 'xiaomi')}</td>
-							<td class="duration">{row.duration}</td>
-						</tr>
-					{/each}
-				</tbody>
-			{:else}
-				<thead><tr><th scope="col">Услуга</th><th scope="col">Описание</th><th scope="col">Цена</th></tr></thead>
-				<tbody>
-					{#each services as service (service.id)}
-						<tr>
-							<td><span class="row-name">{service.name}</span></td>
-							<td class="row-desc">{service.description ?? 'Описание не указано'}</td>
-							<td class="price">{service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</td>
-						</tr>
-					{:else}
-						<tr><td colspan="3" class="duration">{servicesLoading ? 'Загружаем услуги…' : 'Активных услуг пока нет.'}</td></tr>
-					{/each}
-				</tbody>
-			{/if}
+			<thead>
+				<tr>
+					<th scope="col">Услуга</th>
+					<th scope="col">Цена</th>
+					<th scope="col">Срок</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each rows as service (service.id)}
+					<tr>
+						<td>
+							<span class="row-name">{serviceMeta(service.name).displayName}</span>
+							<span class="row-desc">
+								{service.description ?? serviceMeta(service.name).description}
+							</span>
+						</td>
+						<td class="price">{priceText(service.price)}</td>
+						<td class="duration">{serviceMeta(service.name).duration}</td>
+					</tr>
+				{:else}
+					<tr>
+						<td colspan="3" class="duration">
+							{loading ? 'Загружаем услуги…' : (failed ? 'Прайс недоступен.' : 'Активных услуг пока нет.')}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
 		</table>
 	</div>
 
-	<!-- Mobile cards -->
+	<!-- Mobile: cards -->
 	<div class="cards">
-		{#if isMockMode}
-			{#each priceRows as row (row.id)}
-				<article class="card">
-					<header class="card__head"><h2 class="card__name">{row.name}</h2><p class="card__desc">{row.description}</p></header>
-					{#if category === 'all'}
-						<dl class="card__prices">
-							<div><dt>iPhone 11–15</dt><dd>{priceFor(row, 'apple')}</dd></div>
-							<div><dt>Samsung Galaxy</dt><dd>{priceFor(row, 'samsung')}</dd></div>
-							<div><dt>Xiaomi / Redmi</dt><dd>{priceFor(row, 'xiaomi')}</dd></div>
-						</dl>
-					{:else}<p class="card__single-price">{priceFor(row, category)}</p>{/if}
-					<p class="card__duration">Срок: {row.duration}</p>
-				</article>
-			{/each}
+		{#each rows as service (service.id)}
+			<article class="card">
+				<header class="card__head">
+					<h2 class="card__name">{serviceMeta(service.name).displayName}</h2>
+					<p class="card__desc">{service.description ?? serviceMeta(service.name).description}</p>
+				</header>
+				<p class="card__single-price">Стоимость {priceText(service.price).toLowerCase()}</p>
+				<p class="card__duration">Срок: {serviceMeta(service.name).duration}</p>
+			</article>
 		{:else}
-			{#each services as service (service.id)}
-				<article class="card">
-					<header class="card__head"><h2 class="card__name">{service.name}</h2><p class="card__desc">{service.description ?? 'Описание не указано'}</p></header>
-					<p class="card__single-price">{service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</p>
-					<p class="card__duration">Итог подтвердим после диагностики.</p>
-				</article>
-			{:else}<p class="card__desc">{servicesLoading ? 'Загружаем услуги…' : 'Активных услуг пока нет.'}</p>{/each}
-		{/if}
+			<p class="card__desc">
+				{loading ? 'Загружаем услуги…' : (failed ? 'Прайс недоступен.' : 'Активных услуг пока нет.')}
+			</p>
+		{/each}
 	</div>
 
 	<div class="note" role="note">
-		<strong>{isMockMode ? 'Это ориентир, а не окончательный счёт.' : 'Окончательную стоимость подтвердит мастер.'}</strong>
-		{isMockMode
-			? ' Цена зависит от модели и сложности поломки. Точную стоимость подтвердим после бесплатной диагностики и согласуем с вами. Никаких дополнительных работ без вашего согласия.'
-			: ' Цена в списке — цена услуги из базы. Не начинаем дополнительные работы без согласия клиента.'}
+		<strong>Это ориентир, а не окончательный счёт.</strong>
+		Цена зависит от модели и сложности поломки. Точную стоимость подтвердим после бесплатной
+		диагностики и согласуем с вами. Никаких дополнительных работ без вашего согласия.
 	</div>
 
 	<div class="cta">
@@ -167,28 +131,12 @@
 		margin-top: 32px;
 	}
 
-	.filters {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
-	}
-
 	.filter {
 		font-size: 13px;
 		font-weight: 500;
-		color: var(--muted);
-		background: var(--surface);
-		border: 1px solid var(--border);
 		border-radius: 999px;
 		padding: 9px 18px;
-		transition:
-			color 0.15s ease,
-			border-color 0.15s ease,
-			background-color 0.15s ease;
-	}
-
-	.filter:hover {
-		color: var(--text);
+		border: 1px solid var(--border);
 	}
 
 	.filter--active {
@@ -202,14 +150,9 @@
 		color: var(--muted);
 	}
 
-	.service-loading,
 	.load-error {
 		margin-top: 16px;
 		font-size: 14px;
-		color: var(--muted);
-	}
-
-	.load-error {
 		color: var(--danger);
 	}
 
@@ -307,38 +250,14 @@
 		margin-top: 3px;
 	}
 
-	.card__prices {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		margin: 16px 0 0;
-	}
-
-	.card__prices div {
-		display: flex;
-		justify-content: space-between;
-		gap: 12px;
-	}
-
-	.card__prices dt {
-		font-size: 13px;
-		color: var(--muted);
-	}
-
-	.card__prices dd {
-		font-size: 14px;
-		font-weight: 500;
-		margin: 0;
-	}
-
 	.card__single-price {
-		font-size: 20px;
+		font-size: 16px;
 		font-weight: 600;
-		margin: 16px 0 0;
+		margin: 14px 0 0;
 	}
 
 	.card__duration {
-		margin-top: 12px;
+		margin-top: 6px;
 		font-size: 12px;
 		color: var(--muted);
 	}

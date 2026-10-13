@@ -3,12 +3,18 @@
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
-	import { devices, problems, workshop, CUSTOM_DEVICE, workshopWallTimeToUtcIso } from '../../../mocks/db.ts';
+	import {
+		devices,
+		workshop,
+		CUSTOM_DEVICE,
+		serviceMeta,
+		serviceOrderIndex,
+		workshopWallTimeToUtcIso
+	} from '../../../mocks/db.ts';
 	import {
 		ApiError,
 		createOrder,
 		fetchServices,
-		isMockMode,
 		type CreateOrderPayload,
 		type CreateOrderResult,
 		type ServiceDto
@@ -19,20 +25,17 @@
 	let deviceId = $state('');
 	let customManufacturer = $state('');
 	let customDevice = $state('');
-	let problemId = $state('');
-	let description = $state('');
-	let visitTime = $state('');
-	let phone = $state('');
+	let selectedServiceIds = $state<string[]>([]);
+	let contact = $state('');
 	let visitDate = $state('');
+	let visitTime = $state('');
 	let services = $state<ServiceDto[]>([]);
-	let servicesError = $state(false);
-	let apiFieldErrors = $state<Record<string, string>>({});
+	let servicesFailed = $state(false);
 	let touched = $state<Record<string, boolean>>({});
+	let apiFieldErrors = $state<Record<string, string>>({});
 	let submitting = $state(false);
 
-	const problem = $derived(problems.find((p) => p.id === problemId) ?? null);
-	const apiService = $derived(services.find((service) => service.id === problemId) ?? null);
-	const device = $derived(devices.find((d) => d.id === deviceId) ?? null);
+	const device = $derived(devices.find((item) => item.id === deviceId) ?? null);
 	const deviceManufacturer = $derived(
 		device ? device.brand : deviceId === CUSTOM_DEVICE ? customManufacturer.trim() : ''
 	);
@@ -40,28 +43,40 @@
 		device ? device.model : deviceId === CUSTOM_DEVICE ? customDevice.trim() : ''
 	);
 	const deviceName = $derived([deviceManufacturer, deviceModel].filter(Boolean).join(' '));
-	const problemLabel = $derived(isMockMode ? problem?.label ?? '' : apiService?.name ?? '');
+
+	const catalog = $derived(
+		[...services].sort((a, b) => serviceOrderIndex(a.name) - serviceOrderIndex(b.name))
+	);
+	const selectedServices = $derived(services.filter((item) => selectedServiceIds.includes(item.id)));
+	const estimateTotal = $derived(selectedServices.reduce((sum, item) => sum + item.price, 0));
+	const selectedCount = $derived(selectedServices.length);
 
 	$effect(() => {
-		if (isMockMode) return;
 		fetchServices()
 			.then((items) => {
 				services = items;
-				servicesError = false;
+				servicesFailed = false;
 			})
 			.catch(() => {
-				servicesError = true;
+				servicesFailed = true;
 				showToast('Не удалось загрузить список услуг. Проверьте подключение к API.', 'error');
 			});
 	});
 
-	// ── Validation: mirrors the current backend WorkshopOptions ────────────
-	const digitsOnly = $derived(phone.replace(/\D/g, ''));
-	const phoneValid = $derived(/^\+7\d{10}$/.test(`+7${digitsOnly.slice(1)}`) && digitsOnly.length === 11);
-	const descriptionValid = $derived(description.trim().length >= 10);
+	// ── Validation: mirrors the backend WorkshopOptions ────────────────────
+	const contactIsEmail = $derived(contact.includes('@'));
+	const contactValue = $derived(contact.trim());
+	const emailValid = $derived(/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contactValue));
+	const phoneDigits = $derived(contact.replace(/\D/g, ''));
+	const phoneValid = $derived(
+		/^\+7\d{10}$/.test(`+7${phoneDigits.slice(1)}`) && phoneDigits.length === 11
+	);
+	const contactValid = $derived(contactIsEmail ? emailValid : phoneValid);
+
 	const visitTimes = $derived(
-		Array.from({ length: Number(workshop.closeAt.slice(0, 2)) - Number(workshop.openAt.slice(0, 2)) + 1 }, (_, index) =>
-			`${String(Number(workshop.openAt.slice(0, 2)) + index).padStart(2, '0')}:00`
+		Array.from(
+			{ length: Number(workshop.closeAt.slice(0, 2)) - Number(workshop.openAt.slice(0, 2)) + 1 },
+			(_, index) => `${String(Number(workshop.openAt.slice(0, 2)) + index).padStart(2, '0')}:00`
 		)
 	);
 	const minimumVisitDate = $derived(
@@ -82,12 +97,16 @@
 	);
 	const visitError = $derived((() => {
 		if (!visitDate) return null;
-		if (visitDate < minimumVisitDate || (visitDate === minimumVisitDate && visitTime && visitTime <= currentWorkshopTime)) {
+		if (
+			visitDate < minimumVisitDate ||
+			(visitDate === minimumVisitDate && visitTime && visitTime <= currentWorkshopTime)
+		) {
 			return 'Выбранное время визита уже прошло';
 		}
 		const weekday = new Date(`${visitDate}T12:00:00Z`).getUTCDay();
 		const isoWeekday = weekday === 0 ? 7 : weekday;
 		if (!workshop.workingDays.includes(isoWeekday)) return 'Мастерская в этот день закрыта (выходной)';
+
 		return null;
 	})());
 
@@ -95,10 +114,11 @@
 		clientName.trim().length > 0 &&
 		deviceName.length > 0 &&
 		(deviceId !== CUSTOM_DEVICE || deviceManufacturer.length > 0) &&
-		problemId !== '' &&
-		descriptionValid &&
-		phoneValid && visitDate !== '' && visitTime !== '' && !visitError &&
-		(isMockMode || (!servicesError && apiService !== null))
+		selectedServiceIds.length > 0 &&
+		contactValid &&
+		visitDate !== '' &&
+		visitTime !== '' &&
+		!visitError
 	);
 
 	function validateField(name: string): string | null {
@@ -109,15 +129,18 @@
 				return deviceName.length === 0 || (deviceId === CUSTOM_DEVICE && !deviceManufacturer)
 					? 'Укажите производителя и модель устройства'
 					: null;
-			case 'problem':
-				return problemId === '' ? 'Выберите услугу' : null;
-			case 'description':
-				return descriptionValid ? null : 'Опишите проблему — минимум 10 символов';
-			case 'phone':
-				return phoneValid ? null : 'Введите телефон в формате +7 (XXX) XXX-XX-XX';
+			case 'services':
+				return selectedServiceIds.length > 0 ? null : 'Выберите хотя бы одну услугу';
+			case 'contact':
+				return contactValid
+					? null
+					: contactIsEmail
+						? 'Введите корректный email'
+						: 'Введите телефон в формате +7 (XXX) XXX-XX-XX';
 			case 'visit':
 				if (!visitDate) return 'Выберите дату визита';
 				if (!visitTime) return 'Выберите время визита';
+
 				return visitError;
 			default:
 				return null;
@@ -133,38 +156,53 @@
 		delete apiFieldErrors[name];
 	}
 
-	// ── Phone mask +7 (___) ___-__-__ ───────────────────────────────────────
+	// ── Contact mask: keeps emails as typed, masks phone numbers ───────────
 	function formatPhone(raw: string): string {
-		let d = raw.replace(/\D/g, '');
-		if (d.startsWith('8')) d = `7${d.slice(1)}`;
-		if (!d.startsWith('7')) d = `7${d}`;
-		d = d.slice(0, 11);
-		const p = d.slice(1);
-		let out = '+7';
-		if (p.length > 0) out += ` (${p.slice(0, 3)}`;
-		if (p.length >= 3) out += ')';
-		if (p.length > 3) out += ` ${p.slice(3, 6)}`;
-		if (p.length > 6) out += `-${p.slice(6, 8)}`;
-		if (p.length > 8) out += `-${p.slice(8, 10)}`;
-		return out;
+		let digits = raw.replace(/\D/g, '');
+		if (digits.startsWith('8')) digits = `7${digits.slice(1)}`;
+		if (!digits.startsWith('7')) digits = `7${digits}`;
+		digits = digits.slice(0, 11);
+		const rest = digits.slice(1);
+		let output = '+7';
+		if (rest.length > 0) output += ` (${rest.slice(0, 3)}`;
+		if (rest.length >= 3) output += ')';
+		if (rest.length > 3) output += ` ${rest.slice(3, 6)}`;
+		if (rest.length > 6) output += `-${rest.slice(6, 8)}`;
+		if (rest.length > 8) output += `-${rest.slice(8, 10)}`;
+
+		return output;
 	}
 
-	function onPhoneInput(event: Event): void {
-		phone = formatPhone((event.target as HTMLInputElement).value);
+	function onContactInput(event: Event): void {
+		const raw = (event.target as HTMLInputElement).value;
+		contact = /[A-Za-z@]/.test(raw) ? raw : formatPhone(raw);
 	}
 
-	// ── Estimate card ───────────────────────────────────────────────────────
-	const partsPrice = $derived(isMockMode ? problem?.partsPrice ?? 0 : 0);
-	const workPrice = $derived(isMockMode ? problem?.workPrice ?? 0 : apiService?.price ?? 0);
-	const estimateTotal = $derived(partsPrice + workPrice);
-	const selectedServiceIds = $derived(
-		isMockMode ? (problem?.serviceId ? [problem.serviceId] : []) : (apiService ? [apiService.id] : [])
-	);
+	function toggleService(id: string): void {
+		selectedServiceIds = selectedServiceIds.includes(id)
+			? selectedServiceIds.filter((item) => item !== id)
+			: [...selectedServiceIds, id];
+		touched.services = true;
+	}
 
+	// ── Estimate helpers ───────────────────────────────────────────────────
 	const priceFormat = new Intl.NumberFormat('ru-RU');
 
+	function priceText(price: number): string {
+		return price === 0 ? 'Бесплатно' : `от ${priceFormat.format(price)} ₽`;
+	}
+
+	function plural(count: number, forms: [string, string, string]): string {
+		const mod10 = count % 10;
+		const mod100 = count % 100;
+		if (mod10 === 1 && mod100 !== 11) return forms[0];
+		if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+
+		return forms[2];
+	}
+
 	async function submit(): Promise<void> {
-		for (const field of ['name', 'device', 'problem', 'description', 'phone', 'visit']) touched[field] = true;
+		for (const field of ['name', 'device', 'services', 'contact', 'visit']) touched[field] = true;
 		if (!formValid || submitting) return;
 
 		submitting = true;
@@ -172,26 +210,24 @@
 		try {
 			const payload: CreateOrderPayload = {
 				name: clientName.trim(),
-				phone: `+7${digitsOnly.slice(1)}`,
-				email: null,
+				phone: contactIsEmail ? null : `+7${phoneDigits.slice(1)}`,
+				email: contactIsEmail ? contactValue : null,
 				deviceType: 'Phone',
 				deviceManufacturer,
 				deviceModel,
 				preferredVisitAt: workshopWallTimeToUtcIso(visitDate, visitTime),
-				serviceIds: selectedServiceIds,
-				problemDescription: description.trim(),
-				estimateTotal
+				serviceIds: selectedServiceIds
 			};
 			result = await createOrder(payload);
 		} catch (error) {
 			const fieldMap: Record<string, string> = {
 				Name: 'name',
-				Phone: 'phone',
+				Phone: 'contact',
+				Email: 'contact',
 				DeviceType: 'device',
 				DeviceManufacturer: 'device',
 				DeviceModel: 'device',
-				ServiceIds: 'problem',
-				ProblemDescription: 'description',
+				ServiceIds: 'services',
 				PreferredVisitAt: 'visit'
 			};
 			let mappedFieldError = false;
@@ -204,16 +240,21 @@
 					mappedFieldError = true;
 				}
 			}
-			if (!mappedFieldError) showToast(error instanceof Error ? error.message : 'Не удалось отправить заявку. Попробуйте ещё раз.', 'error');
+			if (!mappedFieldError) {
+				showToast(
+					error instanceof Error ? error.message : 'Не удалось отправить заявку. Попробуйте ещё раз.',
+					'error'
+				);
+			}
 			submitting = false;
+
 			return;
 		}
 
 		const query = new URLSearchParams({
 			id: result.id,
-			number: result.number,
 			device: deviceName,
-			problem: problemLabel,
+			services: selectedServices.map((item) => serviceMeta(item.name).displayName).join(', '),
 			price: String(estimateTotal),
 			date: visitDate,
 			time: visitTime
@@ -260,8 +301,8 @@
 					onblur={() => markTouched('device')}
 				>
 					<option value="" disabled selected>Выберите модель</option>
-					{#each devices as d (d.id)}
-						<option value={d.id}>{d.brand} {d.model}</option>
+					{#each devices as item (item.id)}
+						<option value={item.id}>{item.brand} {item.model}</option>
 					{/each}
 					<option value={CUSTOM_DEVICE}>Нет модели в списке? Указать вручную</option>
 				</select>
@@ -271,12 +312,11 @@
 						id="customManufacturer"
 						class="input"
 						class:input--error={!!fieldError('device')}
-						autocomplete="organization"
 						placeholder="Например: Google"
 						bind:value={customManufacturer}
 						onblur={() => markTouched('device')}
 					/>
-					<label class="label" for="customDevice">Модель устройства</label>
+					<label class="label" for="customDevice">Модель</label>
 					<input
 						id="customDevice"
 						class="input"
@@ -292,61 +332,31 @@
 			</div>
 
 			<div class="field">
-				<label class="label" for="problem">Что случилось?</label>
-				<select
-					id="problem"
-					class="input"
-					class:input--error={!!fieldError('problem')}
-					bind:value={problemId}
-					onblur={() => markTouched('problem')}
-					disabled={!isMockMode && services.length === 0}
-				>
-					<option value="" disabled selected>
-						{servicesError ? 'Список услуг недоступен' : isMockMode || services.length ? 'Выберите проблему или услугу' : 'Загружаем услуги…'}
-					</option>
-					{#if isMockMode}
-						{#each problems as p (p.id)}
-							<option value={p.id}>{p.label}</option>
-						{/each}
+				<span class="label">Выберите услуги</span>
+				<span class="hint">Можно выбрать несколько услуг</span>
+				<ul class="services" class:services--error={!!fieldError('services')}>
+					{#each catalog as service (service.id)}
+						<li>
+							<label class="service" class:service--selected={selectedServiceIds.includes(service.id)}>
+								<input
+									type="checkbox"
+									checked={selectedServiceIds.includes(service.id)}
+									onchange={() => toggleService(service.id)}
+									onblur={() => markTouched('services')}
+								/>
+								<span class="service__name">{serviceMeta(service.name).displayName}</span>
+								<span class="service__price">{priceText(service.price)}</span>
+								<span class="service__check" aria-hidden="true">✓</span>
+							</label>
+						</li>
 					{:else}
-						{#each services as service (service.id)}
-							<option value={service.id}>{service.name} · {service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</option>
-						{/each}
-					{/if}
-				</select>
-				{#if fieldError('problem')}
-					<span class="error" role="alert">{fieldError('problem')}</span>
-				{/if}
-				<p class="hint">{isMockMode ? 'Другие популярные проблемы' : 'Выберите услугу из действующего прайс-листа'}</p>
-				<div class="chips">
-					{#if isMockMode}
-						{#each problems.filter((item) => item.id !== 'other') as item (item.id)}
-							<button type="button" class="chip" class:chip--active={problemId === item.id} onclick={() => { problemId = item.id; touched.problem = true; }}>
-								{item.label.split(' · ')[0]}
-							</button>
-						{/each}
-					{:else}
-						{#each services.slice(0, 5) as service (service.id)}
-							<button type="button" class="chip" class:chip--active={problemId === service.id} onclick={() => { problemId = service.id; touched.problem = true; }}>
-								{service.name}
-							</button>
-						{/each}
-					{/if}
-				</div>
-			</div>
-
-			<div class="field">
-				<label class="label" for="description">Описание проблемы</label>
-				<textarea
-					id="description"
-					class="input textarea"
-					class:input--error={!!fieldError('description')}
-					placeholder="Например: телефон быстро разряжается и иногда выключается на 20%."
-					bind:value={description}
-					onblur={() => markTouched('description')}
-				></textarea>
-				{#if fieldError('description')}
-					<span class="error" role="alert">{fieldError('description')}</span>
+						<li class="service service--muted">
+							{servicesFailed ? 'Список услуг недоступен.' : 'Загружаем услуги…'}
+						</li>
+					{/each}
+				</ul>
+				{#if fieldError('services')}
+					<span class="error" role="alert">{fieldError('services')}</span>
 				{/if}
 			</div>
 
@@ -362,7 +372,7 @@
 						bind:value={visitDate}
 						onblur={() => markTouched('visit')}
 					/>
-					<span class="hint">Рабочие дни: {workshop.hours}.</span>
+					<span class="hint">Выберите удобный день для визита в мастерскую.</span>
 					{#if fieldError('visit')}
 						<span class="error" role="alert">{fieldError('visit')}</span>
 					{/if}
@@ -377,21 +387,19 @@
 			</div>
 
 			<div class="field">
-				<label class="label" for="phone">Телефон для связи</label>
+				<label class="label" for="contact">Телефон или почта для связи</label>
 				<input
-					id="phone"
+					id="contact"
 					class="input"
-					class:input--error={!!fieldError('phone')}
-					type="tel"
-					autocomplete="tel"
-					placeholder="+7 (___) ___-__-__"
-					value={phone}
-					oninput={onPhoneInput}
-					onblur={() => markTouched('phone')}
+					class:input--error={!!fieldError('contact')}
+					placeholder="+7 (___) ___-__-__ или mail@example.com"
+					value={contact}
+					oninput={onContactInput}
+					onblur={() => markTouched('contact')}
 				/>
 				<span class="hint">Только для связи по ремонту. Никаких рекламных сообщений.</span>
-				{#if fieldError('phone')}
-					<span class="error" role="alert">{fieldError('phone')}</span>
+				{#if fieldError('contact')}
+					<span class="error" role="alert">{fieldError('contact')}</span>
 				{/if}
 			</div>
 
@@ -401,7 +409,11 @@
 
 			<p class="consent">
 				Нажимая «Отправить заявку», вы соглашаетесь с обработкой персональных данных и
-				<button type="button" class="consent-link" onclick={() => showToast('Политика конфиденциальности появится позже')}>политикой конфиденциальности</button>.
+				<button
+					type="button"
+					class="consent-link"
+					onclick={() => showToast('Политика конфиденциальности появится позже')}
+				>политикой конфиденциальности</button>.
 			</p>
 		</form>
 
@@ -413,38 +425,32 @@
 				{#if deviceName}
 					<p class="estimate__device">{deviceName}</p>
 				{/if}
-				{#if problemLabel}
-					<p class="estimate__service">{problemLabel}</p>
-				{/if}
+				<p class="estimate__count">
+					{selectedCount > 0
+						? `${selectedCount} ${plural(selectedCount, ['выбранная услуга', 'выбранные услуги', 'выбранных услуг'])}`
+						: 'Услуги не выбраны'}
+				</p>
 
 				<dl class="estimate__lines">
-					{#if isMockMode}
+					{#each selectedServices as service (service.id)}
 						<div>
-							<dt>Запчасть</dt>
-							<dd>{problem ? `${priceFormat.format(partsPrice)} ₽` : '—'}</dd>
+							<dt>{serviceMeta(service.name).displayName}</dt>
+							<dd>{priceText(service.price)}</dd>
 						</div>
-						<div>
-							<dt>Работа мастера</dt>
-							<dd>{problem ? `${priceFormat.format(workPrice)} ₽` : '—'}</dd>
-						</div>
-						<div><dt>Диагностика</dt><dd>Бесплатно</dd></div>
-					{:else}
-						<div>
-							<dt>{apiService?.name ?? 'Услуга'}</dt>
-							<dd>{apiService ? `${priceFormat.format(apiService.price)} ₽` : '—'}</dd>
-						</div>
-					{/if}
+					{/each}
+					<div>
+						<dt>Диагностика</dt>
+						<dd>Бесплатно</dd>
+					</div>
 				</dl>
 
 				<div class="estimate__total">
 					<span class="estimate__total-label">Предварительная оценка</span>
 					<span class="estimate__total-value">
-						{problemLabel ? `${priceFormat.format(estimateTotal)} ₽` : '—'}
+						{selectedCount > 0 ? `от ${priceFormat.format(estimateTotal)} ₽` : '—'}
 					</span>
 				</div>
-				<p class="estimate__duration">
-					{isMockMode ? 'Обычно от 40 минут после диагностики' : 'Срок подтвердит мастер после диагностики'}
-				</p>
+				<p class="estimate__duration">Обычно от 40 минут после диагностики</p>
 			</div>
 
 			<div class="estimate__note">
@@ -456,7 +462,7 @@
 				<h3>Что будет после отправки?</h3>
 				<ol class="next-steps">
 					<li>Вы получите номер заявки для отслеживания.</li>
-					<li>Приносите телефон на {workshop.address.split(', ').slice(-1)[0]}.</li>
+					<li>Приносите телефон на {workshop.addressShort}.</li>
 					<li>Мастер проведёт бесплатную диагностику.</li>
 				</ol>
 			</div>
@@ -542,7 +548,6 @@
 		border-color: var(--danger);
 	}
 
-
 	select.input {
 		appearance: none;
 		background-image: linear-gradient(45deg, transparent 49%, var(--muted) 50%),
@@ -555,11 +560,6 @@
 		padding-right: 36px;
 	}
 
-	.textarea {
-		min-height: 110px;
-		resize: vertical;
-	}
-
 	.hint {
 		font-size: 12px;
 		color: var(--muted);
@@ -570,34 +570,71 @@
 		color: var(--danger);
 	}
 
-	.chips {
+	/* ── Services multi-select ── */
+	.services {
 		display: flex;
-		flex-wrap: wrap;
+		flex-direction: column;
 		gap: 8px;
-		margin-top: 8px;
+		margin-top: 6px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		padding: 8px;
+		background: var(--surface);
 	}
 
-	.chip {
+	.services--error {
+		border-color: var(--danger);
+	}
+
+	.service {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 12px;
+		border-radius: 10px;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.service:hover {
+		background: var(--accent-soft);
+	}
+
+	.service--selected {
+		background: var(--accent-soft);
+	}
+
+	.service--muted {
+		color: var(--muted);
+		cursor: default;
+	}
+
+	.service input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.service__name {
+		flex: 1;
+		font-size: 14px;
+	}
+
+	.service__price {
 		font-size: 13px;
 		color: var(--muted);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		padding: 8px 16px;
-		transition:
-			color 0.15s ease,
-			border-color 0.15s ease,
-			background-color 0.15s ease;
+		white-space: nowrap;
 	}
 
-	.chip:hover {
-		color: var(--text);
-	}
-
-	.chip--active {
+	.service__check {
 		color: var(--accent);
-		border-color: var(--accent);
-		background: var(--accent-soft);
+		font-size: 15px;
+		font-weight: 600;
+		opacity: 0;
+	}
+
+	.service--selected .service__check {
+		opacity: 1;
 	}
 
 	.consent {
@@ -640,7 +677,7 @@
 		font-weight: 500;
 	}
 
-	.estimate__service {
+	.estimate__count {
 		font-size: 13px;
 		color: var(--muted);
 		margin-top: 2px;
@@ -656,6 +693,7 @@
 	.estimate__lines div {
 		display: flex;
 		justify-content: space-between;
+		gap: 12px;
 	}
 
 	.estimate__lines dt {
@@ -667,6 +705,7 @@
 		font-size: 14px;
 		font-weight: 500;
 		margin: 0;
+		white-space: nowrap;
 	}
 
 	.estimate__total {
@@ -690,6 +729,7 @@
 	.estimate__total-value {
 		font-size: 28px;
 		font-weight: 600;
+		white-space: nowrap;
 	}
 
 	.estimate__duration {
