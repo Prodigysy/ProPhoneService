@@ -7,14 +7,14 @@
 	} from '../../services/api.ts';
 
 	interface Props {
-		status: RepairStatus;
+		status: RepairStatus | null;
 		onchange: (next: RepairStatus) => void;
 		disabled?: boolean;
 	}
 
 	let { status, onchange, disabled = false }: Props = $props();
 
-	const options = $derived(statusTransitions[status]);
+	const options = $derived(status ? statusTransitions[status] : []);
 </script>
 
 <div class="status-select">
@@ -82,5 +82,17 @@
 		cursor: pointer;
 		border: none;
 		appearance: none;
+	}
+	.status-select__native option {
+		color: var(--text);
+		background-color: var(--surface);
+	}
+
+	.status-select__native {
+		color-scheme: light;
+	}
+
+	:global(:root[data-theme='dark']) .status-select__native {
+		color-scheme: dark;
 	}
 </style>

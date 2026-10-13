@@ -2,37 +2,38 @@
 	import type { RepairStatus } from '../../services/api.ts';
 
 	interface Props {
-		status: RepairStatus;
+		status: RepairStatus | null;
 	}
 
 	let { status }: Props = $props();
+	const statusKey = $derived(status ?? 'Unknown');
 
-	const labels: Record<RepairStatus, string> = {
+	const labels: Record<RepairStatus | 'Unknown', string> = {
 		Created: 'Принята',
 		InDiagnostic: 'Диагностика',
 		Agreed: 'Согласована',
 		InProgress: 'В ремонте',
 		Ready: 'Готово',
 		Completed: 'Выдана',
-		Cancelled: 'Отменена'
+		Cancelled: 'Отменена',
+		Unknown: 'Статус не задан'
 	};
 
-	// Color pairs from the mockup: work=accent, diagnostics=warning,
-	// accepted=info, done=success, terminal/neutral=muted.
-	const toneClass: Record<RepairStatus, string> = {
+	const toneClass: Record<RepairStatus | 'Unknown', string> = {
 		Created: 'badge--info',
 		InDiagnostic: 'badge--warning',
 		Agreed: 'badge--accent',
 		InProgress: 'badge--accent',
 		Ready: 'badge--success',
 		Completed: 'badge--success',
-		Cancelled: 'badge--muted'
+		Cancelled: 'badge--muted',
+		Unknown: 'badge--muted'
 	};
 </script>
 
-<span class="badge {toneClass[status]}">
+<span class="badge {toneClass[statusKey]}">
 	<span class="badge__dot" aria-hidden="true"></span>
-	{labels[status]}
+	{labels[statusKey]}
 </span>
 
 <style>
