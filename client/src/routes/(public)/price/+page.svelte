@@ -100,7 +100,7 @@
 							<td class="price">{service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</td>
 						</tr>
 					{:else}
-						<tr><td colspan="3" class="duration">Активных услуг пока нет.</td></tr>
+						<tr><td colspan="3" class="duration">{servicesLoading ? 'Загружаем услуги…' : 'Активных услуг пока нет.'}</td></tr>
 					{/each}
 				</tbody>
 			{/if}
@@ -130,7 +130,7 @@
 					<p class="card__single-price">{service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</p>
 					<p class="card__duration">Итог подтвердим после диагностики.</p>
 				</article>
-			{:else}<p class="card__desc">Активных услуг пока нет.</p>{/each}
+			{:else}<p class="card__desc">{servicesLoading ? 'Загружаем услуги…' : 'Активных услуг пока нет.'}</p>{/each}
 		{/if}
 	</div>
 
