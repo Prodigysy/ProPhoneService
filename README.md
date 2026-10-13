@@ -59,7 +59,26 @@ Health-check: `GET /health` → `Healthy`.
 ```bash
 cd client
 npm ci
+npm run dev
+```
+
+Open `http://localhost:5173/`. Without `client/.env`, the frontend uses deterministic mock data.
+
+To connect the API from `Darowiin/ProPhoneService`, branch `feat/backend-foundation`, copy `client/.env.example` to `client/.env` and start that backend on port 8080. Vite proxies `/api` to `VITE_API_PROXY_TARGET`, so local development does not require CORS.
+
+```bash
+cd client
+copy .env.example .env   # Windows PowerShell; use cp on POSIX
+npm run dev
+```
+
+The backend branch currently does not persist `ProblemDescription` and its order-list DTO omits client name, services, price, and a human-readable order number. The frontend sends `problemDescription` for the agreed backend contract and displays only fields the current API returns; the backend owner must add persistence before issue descriptions are stored. For production, host the static frontend and proxy `/api` to the backend on the same origin; the backend branch does not configure CORS.
+
+```bash
 npm run lint
+npm run check
+npm run build
+npm run preview
 ```
 
 ## Схема БД
