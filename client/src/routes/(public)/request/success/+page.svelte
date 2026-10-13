@@ -5,33 +5,40 @@
 	import Button from '#lib/components/Button.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 	import type { RepairOrderDto } from '../../../../services/api.ts';
-	import { fetchOrderByNumber } from '../../../../services/api.ts';
+	import { fetchOrderById } from '../../../../services/api.ts';
+	import { workshop } from '../../../../mocks/db.ts';
 
-	// Order recap comes from query params (works after refresh).
-	const number = $derived(page.url.searchParams.get('number'));
+	// The current API uses the returned Guid as its order identifier.
+	const number = $derived(page.url.searchParams.get('number') ?? '');
+	const orderId = $derived(page.url.searchParams.get('id') ?? number);
 	const device = $derived(page.url.searchParams.get('device') ?? '');
 	const problem = $derived(page.url.searchParams.get('problem') ?? '');
 	const price = $derived(page.url.searchParams.get('price') ?? '—');
 	const date = $derived(page.url.searchParams.get('date') ?? '');
+	const time = $derived(page.url.searchParams.get('time') ?? '');
+	const isGuid = $derived(/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(number));
 
 	let order = $state<RepairOrderDto | null>(null);
 	let notFound = $state(false);
 
 	$effect(() => {
-		if (!number) {
+		if (!orderId) {
 			goto('/request');
 			return;
 		}
-		fetchOrderByNumber(number)
-			.then((o) => (order = o))
+		fetchOrderById(orderId)
+			.then((result) => (order = result))
 			.catch(() => (notFound = true));
 	});
 
 	const dateFormatted = $derived(
-		date ? new Date(`${date}T12:00:00`).toLocaleDateString('ru-RU', {
-			day: 'numeric',
-			month: 'long'
-		}) : ''
+		date
+			? new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', {
+				day: 'numeric',
+				month: 'long',
+				timeZone: workshop.timeZone
+			})
+			: ''
 	);
 </script>
 
@@ -45,8 +52,10 @@
 			</div>
 
 			<Eyebrow>Заявка отправлена</Eyebrow>
-			<h1 class="h2 title">Заявка № {number} принята</h1>
-			<p class="number" aria-label="Номер заявки">{number}</p>
+			<h1 class="h2 title">{isGuid ? 'Заявка принята' : `Заявка № ${number} принята`}</h1>
+			<p class="number" aria-label={isGuid ? 'ID заявки' : 'Номер заявки'}>
+				{isGuid ? `ID: ${number}` : number}
+			</p>
 
 			<p class="text">
 				Мы сохранили заявку. Мастер проведёт бесплатную диагностику и подтвердит стоимость.
@@ -58,14 +67,14 @@
 					<div><dt>Устройство</dt><dd>{device}</dd></div>
 				{/if}
 				{#if problem}
-					<div><dt>Проблема</dt><dd>{problem}</dd></div>
+					<div><dt>Услуга</dt><dd>{problem}</dd></div>
 				{/if}
 				{#if dateFormatted}
-					<div><dt>Дата визита</dt><dd>{dateFormatted}</dd></div>
+					<div><dt>Дата визита</dt><dd>{dateFormatted}{time ? `, ${time}` : ''}</dd></div>
 				{/if}
 				<div>
 					<dt>Ориентировочная цена</dt>
-					<dd>{price} ₽</dd>
+					<dd>{price === '—' ? 'Уточнит мастер' : `${price} ₽`}</dd>
 				</div>
 			</dl>
 

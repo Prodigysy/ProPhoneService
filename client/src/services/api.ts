@@ -1,16 +1,14 @@
-// ─────────────────────────────────────────────────────────────────────────────
 // Service layer — the ONLY place in the app that talks to the backend.
-// While VITE_API_URL is unset, works in deterministic mock mode against
-// src/mocks/db.ts. When the ASP.NET Core backend is ready, set VITE_API_URL
-// (e.g. http://localhost:8080) and only this file needs endpoint mapping.
+// With VITE_API_URL unset, deterministic mock data is used.
+// For local API mode set VITE_API_URL=/api; vite.config.ts proxies it to :8080.
 //
-// Contracts mirror server/ProPhoneService.Domain models:
-//   RepairOrder: Id, ClientId, DeviceId, Status, TotalPrice, CreatedAt, PreferredVisitAt
-//   RepairStatus enum: Created, InDiagnostic, Agreed, InProgress, Ready, Completed, Cancelled
-//   RepairStatusTransitions — allowed transitions matrix (same rules below)
-// ─────────────────────────────────────────────────────────────────────────────
+// API contracts are based on Darowiin/ProPhoneService feat/backend-foundation:
+//   GET /api/orders?page=N, POST /api/orders, PATCH /api/orders/{id}/status
+//   GET /api/services
+// The create DTO's ProblemDescription is agreed with the backend owner but is
+// not present on that branch yet; its persistence requires a backend update.
 
-import { problems } from '../mocks/db.ts';
+import { workshop } from '../mocks/db.ts';
 
 export type RepairStatus =
 	| 'Created'
@@ -22,38 +20,59 @@ export type RepairStatus =
 	| 'Cancelled';
 
 export interface RepairOrderDto {
-	/** Guid */
 	id: string;
-	/** Human-readable order number, e.g. 'ПТ-1048' */
+	/** The API exposes the Guid as the order identifier; mocks use the design's ПТ- number. */
 	number: string;
-	clientName: string;
+	clientName: string | null;
 	deviceName: string;
-	serviceName: string;
-	/** null → price not confirmed yet (render '—' / 'Цена' in master panel) */
+	serviceName: string | null;
 	price: number | null;
-	/** 'from' prefix for unconfirmed prices in the mockup */
 	priceFrom: boolean;
-	status: RepairStatus;
-	/** ISO datetime */
+	status: RepairStatus | null;
 	createdAt: string;
 	preferredVisitAt: string | null;
+	statusTimeline?: RepairStatusHistoryDto[];
 }
 
+export interface RepairStatusHistoryDto {
+	status: RepairStatus;
+	changedAt: string;
+	comment: string | null;
+}
+
+export interface ServiceDto {
+	id: string;
+	name: string;
+	price: number;
+	description: string | null;
+}
+
+/** Mirrors POST /api/orders. problemDescription is pending the backend owner's DTO/storage change. */
 export interface CreateOrderPayload {
-	deviceName: string;
-	problemDescription: string;
+	name: string;
 	phone: string;
-	preferredVisitAt: string | null;
-	/** Selected problem/option label, if picked from the list */
-	problemId: string | null;
-	/** Preliminary estimate parts+work shown to the client, ₽ */
-	estimateTotal: number;
+	email: string | null;
+	deviceType: 'Phone' | 'Tablet' | 'Laptop';
+	deviceManufacturer: string;
+	deviceModel: string;
+	preferredVisitAt: string;
+	serviceIds: string[];
+	problemDescription: string;
+	/** Local mock-only total; the API calculates price from ServiceIds. */
+	estimateTotal?: number;
+}
+
+export interface CreateOrderResult {
+	id: string;
+	number: string;
+	status: RepairStatus;
 }
 
 export class ApiError extends Error {
 	constructor(
 		message: string,
-		readonly status?: number
+		readonly status?: number,
+		readonly fieldErrors: Record<string, string[]> = {}
 	) {
 		super(message);
 		this.name = 'ApiError';
@@ -81,6 +100,19 @@ export const statusLabels: Record<RepairStatus, string> = {
 	Completed: 'Выдана',
 	Cancelled: 'Отменена'
 };
+
+const mockServices: ServiceDto[] = [
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e01', name: 'Диагностика (выявление неисправности)', price: 0, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e02', name: 'Замена дисплейного модуля', price: 1500, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e03', name: 'Замена разъема зарядки', price: 1200, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e04', name: 'Замена аккумулятора', price: 1500, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e05', name: 'Замена микрофона', price: 1500, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e06', name: 'Замена динамика', price: 1100, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e07', name: 'Замена кнопки', price: 1200, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e08', name: 'Замена камеры', price: 1500, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e09', name: 'Профилактика', price: 1000, description: null },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e10', name: 'Чистка сеток и разъемов', price: 700, description: null }
+];
 
 // ─── Mock store (module-level, so changes persist during the session) ───────
 
@@ -171,30 +203,29 @@ const orders: RepairOrderDto[] = [
 	}
 ];
 
-// Master panel stats, computed from the mock store (mirrors the mockup cards).
-// Backend will expose real counters later; shape matches what the UI needs.
+// Master panel stats derived from the loaded orders. The current backend DTO
+// returns no revenue or client fields, so those cards render placeholders live.
 
 export interface MasterStats {
-	/** New orders today */
 	todayCount: number;
 	todayDelta: string;
-	/** InProgress + Agreed */
 	inWork: number;
 	inWorkNote: string;
-	/** Sum of Completed order prices this month, formatted */
-	revenueMonth: string;
+	revenueMonth: string | null;
 	revenueNote: string;
-	/** Distinct clients in the store */
-	clientsCount: number;
-	/** Total orders in the store */
+	clientsCount: number | null;
+	clientsNote: string;
 	totalOrders: number;
-	/** Count per status, for filter chips */
 	statusCounts: Record<RepairStatus, number>;
 }
 
 const priceFormat = new Intl.NumberFormat('ru-RU');
 
-function computeMasterStats(now = new Date()): MasterStats {
+export function deriveMasterStats(
+	source: RepairOrderDto[],
+	backendMode = false,
+	now = new Date()
+): MasterStats {
 	const statusCounts: Record<RepairStatus, number> = {
 		Created: 0,
 		InDiagnostic: 0,
@@ -215,25 +246,24 @@ function computeMasterStats(now = new Date()): MasterStats {
 	let monthRevenue = 0;
 	let monthCompleted = 0;
 
-	for (const order of orders) {
-		statusCounts[order.status]++;
-		clients.add(order.clientName);
+	for (const order of source) {
+		if (order.status) statusCounts[order.status]++;
+		if (order.clientName) clients.add(order.clientName);
 		const created = new Date(order.createdAt);
-		if (sameUtcDay(created, now)) todayCount++;
-		if (sameUtcDay(created, new Date(now.getTime() - 86_400_000))) yesterdayCount++;
+		if (sameWorkshopDay(created, now)) todayCount++;
+		if (sameWorkshopDay(created, new Date(now.getTime() - 86_400_000))) yesterdayCount++;
 		if (order.status === 'InProgress' || order.status === 'Agreed') inWork++;
 		if (order.status === 'InDiagnostic') inDiagnostic++;
 		if (
-			order.status === 'Completed' &&
-			order.price !== null &&
-			new Date(order.createdAt).getTime() >= monthStart
+			!backendMode && order.status === 'Completed' && order.price !== null &&
+			created.getTime() >= monthStart
 		) {
 			monthRevenue += order.price;
 			monthCompleted++;
 		}
 	}
 
-	const monthName = now.toLocaleDateString('ru-RU', { month: 'long', timeZone: 'UTC' });
+	const monthName = now.toLocaleDateString('ru-RU', { month: 'long', timeZone: workshop.timeZone });
 	const delta = todayCount - yesterdayCount;
 	return {
 		todayCount,
@@ -243,20 +273,26 @@ function computeMasterStats(now = new Date()): MasterStats {
 				: `${delta > 0 ? '+' : ''}${delta} к предыдущему дню`,
 		inWork,
 		inWorkNote: inDiagnostic > 0 ? `Ещё ${inDiagnostic} — на диагностике` : 'Все вне диагностики',
-		revenueMonth: `${priceFormat.format(monthRevenue)} ₽`,
-		revenueNote: `${monthName} ${now.getUTCFullYear()} · ${monthCompleted} ${pluralize(monthCompleted, ['ремонт', 'ремонта', 'ремонтов'])}`,
-		clientsCount: clients.size,
-		totalOrders: orders.length,
+		revenueMonth: backendMode ? null : `${priceFormat.format(monthRevenue)} ₽`,
+		revenueNote: backendMode
+			? 'Итоговая стоимость не возвращается API'
+			: `${monthName} ${now.getUTCFullYear()} · ${monthCompleted} ${pluralize(monthCompleted, ['ремонт', 'ремонта', 'ремонтов'])}`,
+		clientsCount: backendMode ? null : clients.size,
+		clientsNote: backendMode ? 'Клиенты не возвращаются API' : 'Клиенты в мок-данных',
+		totalOrders: source.length,
 		statusCounts
 	};
 }
 
-function sameUtcDay(a: Date, b: Date): boolean {
-	return (
-		a.getUTCFullYear() === b.getUTCFullYear() &&
-		a.getUTCMonth() === b.getUTCMonth() &&
-		a.getUTCDate() === b.getUTCDate()
-	);
+function sameWorkshopDay(a: Date, b: Date): boolean {
+	const format = new Intl.DateTimeFormat('en-CA', {
+		timeZone: workshop.timeZone,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	});
+
+	return format.format(a) === format.format(b);
 }
 
 function pluralize(n: number, forms: [string, string, string]): string {
@@ -269,74 +305,141 @@ function pluralize(n: number, forms: [string, string, string]): string {
 
 let nextOrderNumber = 1049;
 
-// ─── API functions ──────────────────────────────────────────────────────────
+// Set VITE_API_URL=/api to use the backend. Vite proxies /api to localhost:8080.
+const apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+export const isMockMode = apiBase.length === 0;
+const apiPageSize = 25; // OrderWorkflowService.PageSize in feat/backend-foundation
 
-const baseUrl = import.meta.env.VITE_API_URL as string | undefined;
-const useMocks = !baseUrl;
+interface BackendOrderDto {
+	id: string;
+	status: RepairStatus | null;
+	device: { type: string; manufacturer: string; model: string };
+	preferredVisitAt: string | null;
+	createdAt: string;
+	statusTimeline: RepairStatusHistoryDto[];
+}
+
+interface BackendCreateOrderResponse {
+	id: string;
+}
+
+function asFrontendOrder(order: BackendOrderDto): RepairOrderDto {
+	return {
+		id: order.id,
+		number: order.id,
+		clientName: null,
+		deviceName: [order.device.manufacturer, order.device.model].filter(Boolean).join(' '),
+		serviceName: null,
+		price: null,
+		priceFrom: false,
+		status: order.status,
+		createdAt: order.createdAt,
+		preferredVisitAt: order.preferredVisitAt,
+		statusTimeline: order.statusTimeline
+	};
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(`${baseUrl}${path}`, {
-		headers: { 'Content-Type': 'application/json', ...init?.headers },
-		...init
-	});
+	const headers = new Headers(init?.headers);
+	if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+	const response = await fetch(`${apiBase}${path}`, { ...init, headers });
 	if (!response.ok) {
-		throw new ApiError(`API error: ${response.status}`, response.status);
+		let message = `API вернул ${response.status}`;
+		let fieldErrors: Record<string, string[]> = {};
+		try {
+			const body = (await response.json()) as {
+				title?: string;
+				detail?: string;
+				errors?: Record<string, string[]>;
+			};
+			fieldErrors = body.errors ?? {};
+			message = Object.values(fieldErrors).flat()[0] ?? body.detail ?? body.title ?? message;
+		} catch {
+			// Some API errors, including 204 responses, have no JSON body.
+		}
+		throw new ApiError(message, response.status, fieldErrors);
 	}
+	if (response.status === 204) return undefined as T;
 	return (await response.json()) as T;
 }
 
-const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms = 250) => {
+	const { promise, resolve } = Promise.withResolvers<void>();
+	setTimeout(resolve, ms);
+	return promise;
+};
 
 export async function fetchOrders(): Promise<RepairOrderDto[]> {
-	if (useMocks) {
+	if (isMockMode) {
 		await delay();
 		return [...orders];
 	}
-	return request<RepairOrderDto[]>('/orders');
-}
 
-export async function fetchMasterStats(): Promise<MasterStats> {
-	if (useMocks) {
-		await delay(150);
-		return computeMasterStats();
+	const result: RepairOrderDto[] = [];
+	for (let page = 1; ; page++) {
+		const items = await request<BackendOrderDto[]>(`/orders?page=${page}`);
+		result.push(...items.map(asFrontendOrder));
+		if (items.length < apiPageSize) break;
 	}
-	return request<MasterStats>('/master/stats');
+	return result;
 }
 
-export async function fetchOrderByNumber(number: string): Promise<RepairOrderDto> {
-	if (useMocks) {
+export async function fetchServices(): Promise<ServiceDto[]> {
+	if (isMockMode) {
 		await delay();
-		const order = orders.find((o) => o.number.toLowerCase() === number.toLowerCase());
+		return mockServices.map((service) => ({ ...service }));
+	}
+	return request<ServiceDto[]>('/services');
+}
+
+export async function fetchOrderById(id: string): Promise<RepairOrderDto> {
+	if (isMockMode) {
+		await delay();
+		const order = orders.find((item) => item.id === id || item.number.toLowerCase() === id.toLowerCase());
 		if (!order) throw new ApiError('Заявка не найдена', 404);
 		return { ...order };
 	}
-	return request<RepairOrderDto>(`/orders/${encodeURIComponent(number)}`);
+	const order = (await fetchOrders()).find((item) => item.id.toLowerCase() === id.toLowerCase());
+	if (!order) throw new ApiError('Заявка не найдена', 404);
+	return order;
 }
 
-export async function createOrder(
-	payload: CreateOrderPayload
-): Promise<{ number: string; status: RepairStatus }> {
-	if (useMocks) {
-		await delay(600);
+export async function createOrder(payload: CreateOrderPayload): Promise<CreateOrderResult> {
+	if (isMockMode) {
+		await delay(350);
 		const number = `ПТ-${nextOrderNumber++}`;
+		const selectedServices = mockServices.filter((service) => payload.serviceIds.includes(service.id));
+		const orderId = crypto.randomUUID();
 		orders.unshift({
-			id: crypto.randomUUID(),
+			id: orderId,
 			number,
-			clientName: 'Новый клиент',
-			deviceName: payload.deviceName,
-			serviceName: payload.problemId ? problemLabel(payload.problemId) : 'Диагностика',
-			price: payload.estimateTotal || null,
-			priceFrom: !payload.estimateTotal,
+			clientName: payload.name,
+			deviceName: `${payload.deviceManufacturer} ${payload.deviceModel}`.trim(),
+			serviceName: selectedServices.map((service) => service.name).join(', ') || 'Диагностика',
+			price: payload.estimateTotal ?? selectedServices.reduce((sum, service) => sum + service.price, 0),
+			priceFrom: false,
 			status: 'Created',
 			createdAt: new Date().toISOString(),
 			preferredVisitAt: payload.preferredVisitAt
 		});
-		return { number, status: 'Created' };
+		return { id: orderId, number, status: 'Created' };
 	}
-	return request<{ number: string; status: RepairStatus }>('/orders', {
+
+	const result = await request<BackendCreateOrderResponse>('/orders', {
 		method: 'POST',
-		body: JSON.stringify(payload)
+		body: JSON.stringify({
+			name: payload.name,
+			phone: payload.phone,
+			email: payload.email,
+			deviceType: payload.deviceType,
+			deviceManufacturer: payload.deviceManufacturer,
+			deviceModel: payload.deviceModel,
+			preferredVisitAt: payload.preferredVisitAt,
+			serviceIds: payload.serviceIds,
+			problemDescription: payload.problemDescription
+		})
 	});
+	return { id: result.id, number: result.id, status: 'Created' };
 }
 
 export async function changeOrderStatus(
@@ -344,25 +447,25 @@ export async function changeOrderStatus(
 	next: RepairStatus,
 	comment?: string
 ): Promise<void> {
-	if (useMocks) {
+	if (isMockMode) {
 		await delay(300);
-		const order = orders.find((o) => o.id === orderId);
+		const order = orders.find((item) => item.id === orderId);
 		if (!order) throw new ApiError('Заявка не найдена', 404);
-		const allowed = statusTransitions[order.status];
-		if (!allowed.includes(next)) {
-			throw new ApiError(`Недопустимый переход статуса: ${statusLabels[order.status]} → ${statusLabels[next]}`, 409);
+		if (!order.status || !statusTransitions[order.status].includes(next)) {
+			throw new ApiError(
+				`Недопустимый переход статуса: ${order.status ? statusLabels[order.status] : 'не задан'} → ${statusLabels[next]}`,
+				409
+			);
 		}
 		order.status = next;
+		order.statusTimeline = [
+			...(order.statusTimeline ?? []),
+			{ status: next, changedAt: new Date().toISOString(), comment: comment ?? null }
+		];
 		return;
 	}
-	await request<void>(`/orders/${orderId}/status`, {
+	await request<void>(`/orders/${encodeURIComponent(orderId)}/status`, {
 		method: 'PATCH',
 		body: JSON.stringify({ status: next, comment })
 	});
-}
-
-// Problem labels from the mockup (form select) — used by mock createOrder.
-
-function problemLabel(problemId: string): string {
-	return problems.find((p) => p.id === problemId)?.label ?? 'Диагностика';
 }

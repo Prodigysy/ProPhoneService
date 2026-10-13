@@ -3,67 +3,134 @@
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
-	import { devices, problems, workshop, CUSTOM_DEVICE } from '../../../mocks/db.ts';
-	import { createOrder, type CreateOrderPayload } from '../../../services/api.ts';
+	import { devices, problems, workshop, CUSTOM_DEVICE, workshopWallTimeToUtcIso } from '../../../mocks/db.ts';
+	import {
+		ApiError,
+		createOrder,
+		fetchServices,
+		isMockMode,
+		type CreateOrderPayload,
+		type CreateOrderResult,
+		type ServiceDto
+	} from '../../../services/api.ts';
 
 	// ── Form state ─────────────────────────────────────────────────────────
+	let clientName = $state('');
 	let deviceId = $state('');
+	let customManufacturer = $state('');
 	let customDevice = $state('');
 	let problemId = $state('');
 	let description = $state('');
+	let visitTime = $state('');
 	let phone = $state('');
 	let visitDate = $state('');
+	let services = $state<ServiceDto[]>([]);
+	let servicesError = $state(false);
+	let apiFieldErrors = $state<Record<string, string>>({});
 	let touched = $state<Record<string, boolean>>({});
 	let submitting = $state(false);
 
 	const problem = $derived(problems.find((p) => p.id === problemId) ?? null);
+	const apiService = $derived(services.find((service) => service.id === problemId) ?? null);
 	const device = $derived(devices.find((d) => d.id === deviceId) ?? null);
-	const deviceName = $derived(
-		deviceId === CUSTOM_DEVICE
-			? customDevice.trim()
-			: (device ? `${device.brand} ${device.model}` : '')
+	const deviceManufacturer = $derived(
+		device ? device.brand : deviceId === CUSTOM_DEVICE ? customManufacturer.trim() : ''
 	);
+	const deviceModel = $derived(
+		device ? device.model : deviceId === CUSTOM_DEVICE ? customDevice.trim() : ''
+	);
+	const deviceName = $derived([deviceManufacturer, deviceModel].filter(Boolean).join(' '));
+	const problemLabel = $derived(isMockMode ? problem?.label ?? '' : apiService?.name ?? '');
 
-// ── Validation (mirrors backend VisitTimeValidator messages) ───────────
-const digitsOnly = $derived(phone.replace(/\D/g, ''));
-const phoneValid = $derived(/^\+7\d{10}$/.test(`+7${digitsOnly.slice(1)}`) && digitsOnly.length === 11);
+	$effect(() => {
+		if (isMockMode) return;
+		fetchServices()
+			.then((items) => {
+				services = items;
+				servicesError = false;
+			})
+			.catch(() => {
+				servicesError = true;
+				showToast('Не удалось загрузить список услуг. Проверьте подключение к API.', 'error');
+			});
+	});
 
-const visitError = $derived((() => {
-	if (!visitDate) return null;
-	const selected = new Date(`${visitDate}T12:00:00`);
-	const now = Date.now();
-	if (selected.getTime() < now - 24 * 60 * 60 * 1000) return 'Выбранное время визита уже прошло';
-	return null;
-})());
-
+	// ── Validation: mirrors the current backend WorkshopOptions ────────────
+	const digitsOnly = $derived(phone.replace(/\D/g, ''));
+	const phoneValid = $derived(/^\+7\d{10}$/.test(`+7${digitsOnly.slice(1)}`) && digitsOnly.length === 11);
 	const descriptionValid = $derived(description.trim().length >= 10);
+	const visitTimes = $derived(
+		Array.from({ length: Number(workshop.closeAt.slice(0, 2)) - Number(workshop.openAt.slice(0, 2)) + 1 }, (_, index) =>
+			`${String(Number(workshop.openAt.slice(0, 2)) + index).padStart(2, '0')}:00`
+		)
+	);
+	const minimumVisitDate = $derived(
+		new Intl.DateTimeFormat('en-CA', {
+			timeZone: workshop.timeZone,
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).format(new Date())
+	);
+	const currentWorkshopTime = $derived(
+		new Intl.DateTimeFormat('en-GB', {
+			timeZone: workshop.timeZone,
+			hour: '2-digit',
+			minute: '2-digit',
+			hourCycle: 'h23'
+		}).format(new Date())
+	);
+	const visitError = $derived((() => {
+		if (!visitDate) return null;
+		if (visitDate < minimumVisitDate || (visitDate === minimumVisitDate && visitTime && visitTime <= currentWorkshopTime)) {
+			return 'Выбранное время визита уже прошло';
+		}
+		const weekday = new Date(`${visitDate}T12:00:00Z`).getUTCDay();
+		const isoWeekday = weekday === 0 ? 7 : weekday;
+		if (!workshop.workingDays.includes(isoWeekday)) return 'Мастерская в этот день закрыта (выходной)';
+		return null;
+	})());
+
 	const formValid = $derived(
-		deviceName.length > 0 && problemId !== '' && descriptionValid && phoneValid && visitDate !== '' && !visitError
+		clientName.trim().length > 0 &&
+		deviceName.length > 0 &&
+		(deviceId !== CUSTOM_DEVICE || deviceManufacturer.length > 0) &&
+		problemId !== '' &&
+		descriptionValid &&
+		phoneValid && visitDate !== '' && visitTime !== '' && !visitError &&
+		(isMockMode || (!servicesError && apiService !== null))
 	);
 
 	function validateField(name: string): string | null {
 		switch (name) {
+			case 'name':
+				return clientName.trim().length > 0 ? null : 'Укажите ваше имя';
 			case 'device':
-				return deviceName.length === 0 ? 'Выберите модель устройства' : null;
+				return deviceName.length === 0 || (deviceId === CUSTOM_DEVICE && !deviceManufacturer)
+					? 'Укажите производителя и модель устройства'
+					: null;
 			case 'problem':
-				return problemId === '' ? 'Выберите, что случилось' : null;
+				return problemId === '' ? 'Выберите услугу' : null;
 			case 'description':
 				return descriptionValid ? null : 'Опишите проблему — минимум 10 символов';
 			case 'phone':
 				return phoneValid ? null : 'Введите телефон в формате +7 (XXX) XXX-XX-XX';
 			case 'visit':
-				return visitDate === '' ? 'Выберите дату визита' : visitError;
+				if (!visitDate) return 'Выберите дату визита';
+				if (!visitTime) return 'Выберите время визита';
+				return visitError;
 			default:
 				return null;
 		}
 	}
 
 	function fieldError(name: string): string | null {
-		return touched[name] ? validateField(name) : null;
+		return touched[name] ? (apiFieldErrors[name] ?? validateField(name)) : null;
 	}
 
 	function markTouched(name: string): void {
 		touched[name] = true;
+		delete apiFieldErrors[name];
 	}
 
 	// ── Phone mask +7 (___) ___-__-__ ───────────────────────────────────────
@@ -87,42 +154,69 @@ const visitError = $derived((() => {
 	}
 
 	// ── Estimate card ───────────────────────────────────────────────────────
-	const partsPrice = $derived(problem ? problem.partsPrice : 0);
-	const workPrice = $derived(problem ? problem.workPrice : 0);
+	const partsPrice = $derived(isMockMode ? problem?.partsPrice ?? 0 : 0);
+	const workPrice = $derived(isMockMode ? problem?.workPrice ?? 0 : apiService?.price ?? 0);
 	const estimateTotal = $derived(partsPrice + workPrice);
+	const selectedServiceIds = $derived(
+		isMockMode ? (problem?.serviceId ? [problem.serviceId] : []) : (apiService ? [apiService.id] : [])
+	);
 
 	const priceFormat = new Intl.NumberFormat('ru-RU');
 
 	async function submit(): Promise<void> {
-		Object.keys({ device: 1, problem: 1, description: 1, phone: 1, visit: 1 }).forEach(
-			(k) => (touched[k] = true)
-		);
+		for (const field of ['name', 'device', 'problem', 'description', 'phone', 'visit']) touched[field] = true;
 		if (!formValid || submitting) return;
 
 		submitting = true;
-		let result: { number: string };
+		let result: CreateOrderResult;
 		try {
 			const payload: CreateOrderPayload = {
-				deviceName,
-				problemDescription: description.trim(),
+				name: clientName.trim(),
 				phone: `+7${digitsOnly.slice(1)}`,
-				preferredVisitAt: visitDate ? new Date(`${visitDate}T12:00:00Z`).toISOString() : null,
-				problemId,
+				email: null,
+				deviceType: 'Phone',
+				deviceManufacturer,
+				deviceModel,
+				preferredVisitAt: workshopWallTimeToUtcIso(visitDate, visitTime),
+				serviceIds: selectedServiceIds,
+				problemDescription: description.trim(),
 				estimateTotal
 			};
 			result = await createOrder(payload);
-		} catch {
-			showToast('Не удалось отправить заявку. Попробуйте ещё раз.', 'error');
+		} catch (error) {
+			const fieldMap: Record<string, string> = {
+				Name: 'name',
+				Phone: 'phone',
+				DeviceType: 'device',
+				DeviceManufacturer: 'device',
+				DeviceModel: 'device',
+				ServiceIds: 'problem',
+				ProblemDescription: 'description',
+				PreferredVisitAt: 'visit'
+			};
+			let mappedFieldError = false;
+			if (error instanceof ApiError) {
+				for (const [backendField, messages] of Object.entries(error.fieldErrors)) {
+					const formField = fieldMap[backendField];
+					if (!formField || !messages[0]) continue;
+					apiFieldErrors[formField] = messages[0];
+					touched[formField] = true;
+					mappedFieldError = true;
+				}
+			}
+			if (!mappedFieldError) showToast(error instanceof Error ? error.message : 'Не удалось отправить заявку. Попробуйте ещё раз.', 'error');
 			submitting = false;
 			return;
 		}
 
 		const query = new URLSearchParams({
+			id: result.id,
 			number: result.number,
 			device: deviceName,
-			problem: problem?.label ?? '',
+			problem: problemLabel,
 			price: String(estimateTotal),
-			date: visitDate
+			date: visitDate,
+			time: visitTime
 		});
 		await goto(`/request/success?${query}`);
 	}
@@ -144,6 +238,19 @@ const visitError = $derived((() => {
 			</div>
 
 			<div class="field">
+				<label class="label" for="clientName">Ваше имя</label>
+				<input
+					id="clientName"
+					class="input"
+					class:input--error={!!fieldError('name')}
+					autocomplete="name"
+					bind:value={clientName}
+					onblur={() => markTouched('name')}
+				/>
+				{#if fieldError('name')}<span class="error" role="alert">{fieldError('name')}</span>{/if}
+			</div>
+
+			<div class="field">
 				<label class="label" for="device">Модель устройства</label>
 				<select
 					id="device"
@@ -159,11 +266,22 @@ const visitError = $derived((() => {
 					<option value={CUSTOM_DEVICE}>Нет модели в списке? Указать вручную</option>
 				</select>
 				{#if deviceId === CUSTOM_DEVICE}
+					<label class="label" for="customManufacturer">Производитель</label>
 					<input
-						class="input input--mt"
+						id="customManufacturer"
+						class="input"
 						class:input--error={!!fieldError('device')}
-						type="text"
-						placeholder="Например: Google Pixel 8"
+						autocomplete="organization"
+						placeholder="Например: Google"
+						bind:value={customManufacturer}
+						onblur={() => markTouched('device')}
+					/>
+					<label class="label" for="customDevice">Модель устройства</label>
+					<input
+						id="customDevice"
+						class="input"
+						class:input--error={!!fieldError('device')}
+						placeholder="Например: Pixel 8"
 						bind:value={customDevice}
 						onblur={() => markTouched('device')}
 					/>
@@ -181,30 +299,39 @@ const visitError = $derived((() => {
 					class:input--error={!!fieldError('problem')}
 					bind:value={problemId}
 					onblur={() => markTouched('problem')}
+					disabled={!isMockMode && services.length === 0}
 				>
-					<option value="" disabled selected>Выберите проблему</option>
-					{#each problems as p (p.id)}
-						<option value={p.id}>{p.label}</option>
-					{/each}
+					<option value="" disabled selected>
+						{servicesError ? 'Список услуг недоступен' : isMockMode || services.length ? 'Выберите проблему или услугу' : 'Загружаем услуги…'}
+					</option>
+					{#if isMockMode}
+						{#each problems as p (p.id)}
+							<option value={p.id}>{p.label}</option>
+						{/each}
+					{:else}
+						{#each services as service (service.id)}
+							<option value={service.id}>{service.name} · {service.price === 0 ? 'Бесплатно' : `${priceFormat.format(service.price)} ₽`}</option>
+						{/each}
+					{/if}
 				</select>
 				{#if fieldError('problem')}
 					<span class="error" role="alert">{fieldError('problem')}</span>
 				{/if}
-				<p class="hint">Другие популярные проблемы</p>
+				<p class="hint">{isMockMode ? 'Другие популярные проблемы' : 'Выберите услугу из действующего прайс-листа'}</p>
 				<div class="chips">
-					{#each problems.filter((p) => p.id !== 'other') as p (p.id)}
-						<button
-							type="button"
-							class="chip"
-							class:chip--active={problemId === p.id}
-							onclick={() => {
-								problemId = p.id;
-								touched.problem = true;
-							}}
-						>
-							{p.label.split(' · ')[0]}
-						</button>
-					{/each}
+					{#if isMockMode}
+						{#each problems.filter((item) => item.id !== 'other') as item (item.id)}
+							<button type="button" class="chip" class:chip--active={problemId === item.id} onclick={() => { problemId = item.id; touched.problem = true; }}>
+								{item.label.split(' · ')[0]}
+							</button>
+						{/each}
+					{:else}
+						{#each services.slice(0, 5) as service (service.id)}
+							<button type="button" class="chip" class:chip--active={problemId === service.id} onclick={() => { problemId = service.id; touched.problem = true; }}>
+								{service.name}
+							</button>
+						{/each}
+					{/if}
 				</div>
 			</div>
 
@@ -231,32 +358,41 @@ const visitError = $derived((() => {
 						class="input"
 						class:input--error={!!fieldError('visit')}
 						type="date"
-						min={new Date().toISOString().slice(0, 10)}
+						min={minimumVisitDate}
 						bind:value={visitDate}
 						onblur={() => markTouched('visit')}
 					/>
-					<span class="hint">Выберите удобный день для визита в мастерскую.</span>
+					<span class="hint">Рабочие дни: {workshop.hours}.</span>
 					{#if fieldError('visit')}
 						<span class="error" role="alert">{fieldError('visit')}</span>
 					{/if}
 				</div>
 				<div class="field">
-					<label class="label" for="phone">Телефон для связи</label>
-					<input
-						id="phone"
-						class="input"
-						class:input--error={!!fieldError('phone')}
-						type="tel"
-						placeholder="+7 (___) ___-__-__"
-						value={phone}
-						oninput={onPhoneInput}
-						onblur={() => markTouched('phone')}
-					/>
-					<span class="hint">Только для связи по ремонту. Никаких рекламных сообщений.</span>
-					{#if fieldError('phone')}
-						<span class="error" role="alert">{fieldError('phone')}</span>
-					{/if}
+					<label class="label" for="visitTime">Время визита</label>
+					<select id="visitTime" class="input" bind:value={visitTime} onblur={() => markTouched('visit')}>
+						<option value="" disabled selected>Выберите время</option>
+						{#each visitTimes as time (time)}<option value={time}>{time}</option>{/each}
+					</select>
 				</div>
+			</div>
+
+			<div class="field">
+				<label class="label" for="phone">Телефон для связи</label>
+				<input
+					id="phone"
+					class="input"
+					class:input--error={!!fieldError('phone')}
+					type="tel"
+					autocomplete="tel"
+					placeholder="+7 (___) ___-__-__"
+					value={phone}
+					oninput={onPhoneInput}
+					onblur={() => markTouched('phone')}
+				/>
+				<span class="hint">Только для связи по ремонту. Никаких рекламных сообщений.</span>
+				{#if fieldError('phone')}
+					<span class="error" role="alert">{fieldError('phone')}</span>
+				{/if}
 			</div>
 
 			<Button type="submit" size="lg" disabled={!formValid || submitting}>
@@ -277,32 +413,38 @@ const visitError = $derived((() => {
 				{#if deviceName}
 					<p class="estimate__device">{deviceName}</p>
 				{/if}
-				{#if problem}
-					<p class="estimate__service">{problem.label}</p>
+				{#if problemLabel}
+					<p class="estimate__service">{problemLabel}</p>
 				{/if}
 
 				<dl class="estimate__lines">
-					<div>
-						<dt>Запчасть</dt>
-						<dd>{problem ? `${priceFormat.format(partsPrice)} ₽` : '—'}</dd>
-					</div>
-					<div>
-						<dt>Работа мастера</dt>
-						<dd>{problem ? `${priceFormat.format(workPrice)} ₽` : '—'}</dd>
-					</div>
-					<div>
-						<dt>Диагностика</dt>
-						<dd>Бесплатно</dd>
-					</div>
+					{#if isMockMode}
+						<div>
+							<dt>Запчасть</dt>
+							<dd>{problem ? `${priceFormat.format(partsPrice)} ₽` : '—'}</dd>
+						</div>
+						<div>
+							<dt>Работа мастера</dt>
+							<dd>{problem ? `${priceFormat.format(workPrice)} ₽` : '—'}</dd>
+						</div>
+						<div><dt>Диагностика</dt><dd>Бесплатно</dd></div>
+					{:else}
+						<div>
+							<dt>{apiService?.name ?? 'Услуга'}</dt>
+							<dd>{apiService ? `${priceFormat.format(apiService.price)} ₽` : '—'}</dd>
+						</div>
+					{/if}
 				</dl>
 
 				<div class="estimate__total">
 					<span class="estimate__total-label">Предварительная оценка</span>
 					<span class="estimate__total-value">
-						{problem ? `${priceFormat.format(estimateTotal)} ₽` : '—'}
+						{problemLabel ? `${priceFormat.format(estimateTotal)} ₽` : '—'}
 					</span>
 				</div>
-				<p class="estimate__duration">Обычно от 40 минут после диагностики</p>
+				<p class="estimate__duration">
+					{isMockMode ? 'Обычно от 40 минут после диагностики' : 'Срок подтвердит мастер после диагностики'}
+				</p>
 			</div>
 
 			<div class="estimate__note">
@@ -400,9 +542,6 @@ const visitError = $derived((() => {
 		border-color: var(--danger);
 	}
 
-	.input--mt {
-		margin-top: 8px;
-	}
 
 	select.input {
 		appearance: none;

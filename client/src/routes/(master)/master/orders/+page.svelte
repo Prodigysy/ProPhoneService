@@ -1,9 +1,11 @@
 <script lang="ts">
 	import StatusSelect from '#lib/components/StatusSelect.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
+	import { workshop } from '../../../../mocks/db.ts';
 	import {
 		fetchOrders,
-		fetchMasterStats,
+		deriveMasterStats,
+		isMockMode,
 		changeOrderStatus,
 		statusLabels,
 		type RepairOrderDto,
@@ -36,7 +38,7 @@
 				if (!q) return true;
 				return (
 					o.number.toLowerCase().includes(q) ||
-					o.clientName.toLowerCase().includes(q) ||
+					(o.clientName?.toLowerCase().includes(q) ?? false) ||
 					o.deviceName.toLowerCase().includes(q)
 				);
 			})
@@ -60,10 +62,10 @@
 
 	// ── Load ────────────────────────────────────────────────────────────────
 	$effect(() => {
-		Promise.all([fetchOrders(), fetchMasterStats()])
-			.then(([list, s]) => {
+		fetchOrders()
+			.then((list) => {
 				orders = list;
-				stats = s;
+				stats = deriveMasterStats(list, !isMockMode);
 			})
 			.catch(() => {
 				loadError = true;
@@ -83,33 +85,24 @@
 	let changing = $state<string | null>(null);
 
 	async function onStatusChange(order: RepairOrderDto, next: RepairStatus): Promise<void> {
-		if (changing) return;
+		if (changing || !order.status) return;
 		changing = order.id;
-		const prev = order.status;
-		// Optimistic update; revert on failure
+		const previous = order.status;
 		order.status = next;
 		try {
 			await changeOrderStatus(order.id, next);
-			if (stats) {
-				stats.statusCounts[prev]--;
-				stats.statusCounts[next]++;
-				if (prev === 'InProgress' || prev === 'Agreed') stats.inWork--;
-				if (next === 'InProgress' || next === 'Agreed') stats.inWork++;
-				if (prev === 'InDiagnostic') stats.inWorkNote = recalcDiagnosticNote();
-				if (next === 'InDiagnostic') stats.inWorkNote = recalcDiagnosticNote();
-			}
-			showToast(`Заявка ${order.number}: статус изменён на «${statusLabels[next]}»`);
-		} catch (e) {
-			order.status = prev;
-			showToast(e instanceof Error ? e.message : 'Не удалось изменить статус', 'error');
+			stats = deriveMasterStats(orders, !isMockMode);
+			showToast(`Заявка ${displayReference(order)}: статус изменён на «${statusLabels[next]}»`);
+		} catch (error) {
+			order.status = previous;
+			showToast(error instanceof Error ? error.message : 'Не удалось изменить статус', 'error');
 		} finally {
 			changing = null;
 		}
 	}
 
-	function recalcDiagnosticNote(): string {
-		const onDiag = orders.filter((o) => o.status === 'InDiagnostic').length;
-		return onDiag > 0 ? `Ещё ${onDiag} — на диагностике` : 'Все вне диагностики';
+	function displayReference(order: RepairOrderDto): string {
+		return order.id === order.number ? order.id.slice(0, 8).toUpperCase() : order.number;
 	}
 
 	// ── Formatting ──────────────────────────────────────────────────────────
@@ -117,7 +110,15 @@
 		return new Date(iso).toLocaleDateString('ru-RU', {
 			day: '2-digit',
 			month: '2-digit',
-			timeZone: 'UTC'
+			timeZone: workshop.timeZone
+		});
+	}
+
+	function formatVisit(iso: string): string {
+		return new Date(iso).toLocaleString('ru-RU', {
+			dateStyle: 'short',
+			timeStyle: 'short',
+			timeZone: workshop.timeZone
 		});
 	}
 
@@ -131,7 +132,7 @@
 			weekday: 'long',
 			day: 'numeric',
 			month: 'long',
-			timeZone: 'UTC'
+			timeZone: workshop.timeZone
 		})
 	);
 </script>
@@ -140,7 +141,7 @@
 	<header class="orders__head">
 		<div>
 			<h1 class="orders__title">Заявки на ремонт</h1>
-			<p class="orders__date">{todayLabel} · Все срочное в одной очереди</p>
+			<p class="orders__date">{todayLabel} · Всё важное в одной очереди</p>
 		</div>
 		<a class="orders__new" href="/request">+ Новая заявка</a>
 	</header>
@@ -160,8 +161,13 @@
 			</article>
 			<article class="stat">
 				<p class="stat__label">Выручка за месяц</p>
-				<p class="stat__value">{stats.revenueMonth}</p>
+				<p class="stat__value">{stats.revenueMonth ?? '—'}</p>
 				<p class="stat__note">{stats.revenueNote}</p>
+			</article>
+			<article class="stat">
+				<p class="stat__label">Клиенты</p>
+				<p class="stat__value">{stats.clientsCount ?? '—'}</p>
+				<p class="stat__note">{stats.clientsNote}</p>
 			</article>
 		</section>
 	{/if}
@@ -176,7 +182,7 @@
 			<input
 				class="search__input"
 				type="search"
-				placeholder="Номер заявки, клиент или устройство"
+				placeholder={isMockMode ? 'Номер заявки, клиент или устройство' : 'ID заявки или устройство'}
 				aria-label="Поиск по заявкам"
 				bind:value={query}
 			/>
@@ -215,34 +221,34 @@
 			<div class="table__scroll">
 				<table class="table__grid">
 					<thead>
-						<tr>
-							<th scope="col">№ заявки</th>
-							<th scope="col">Клиент</th>
-							<th scope="col">Устройство</th>
-							<th scope="col">Услуга</th>
-							<th scope="col">Цена</th>
-							<th scope="col">Статус</th>
-							<th scope="col">Дата</th>
-						</tr>
+						{#if isMockMode}
+							<tr>
+								<th scope="col">№ заявки</th><th scope="col">Клиент</th><th scope="col">Устройство</th><th scope="col">Услуга</th><th scope="col">Цена</th><th scope="col">Статус</th><th scope="col">Дата</th>
+							</tr>
+						{:else}
+							<tr>
+								<th scope="col">ID заявки</th><th scope="col">Устройство</th><th scope="col">Желаемый визит</th><th scope="col">Создана</th><th scope="col">Статус</th>
+							</tr>
+						{/if}
 					</thead>
 					<tbody>
 						{#each pageOrders as order (order.id)}
 							<tr class:row--changing={changing === order.id}>
-								<td>
-									<span class="row__number">{order.number}</span>
-									<span class="row__client">{order.clientName}</span>
-								</td>
-								<td class="row__device">{order.deviceName}</td>
-								<td class="row__service">{order.serviceName}</td>
-								<td class="row__price">{price(order)}</td>
-								<td>
-									<StatusSelect
-										status={order.status}
-										disabled={changing !== null}
-										onchange={(next) => onStatusChange(order, next)}
-									/>
-								</td>
-								<td class="row__date">{formatDate(order.createdAt)}</td>
+								{#if isMockMode}
+									<td><span class="row__number">{displayReference(order)}</span></td>
+									<td class="row__client">{order.clientName ?? '—'}</td>
+									<td class="row__device">{order.deviceName}</td>
+									<td class="row__service">{order.serviceName ?? '—'}</td>
+									<td class="row__price">{price(order)}</td>
+									<td><StatusSelect status={order.status} disabled={changing !== null} onchange={(next) => onStatusChange(order, next)} /></td>
+									<td class="row__date">{formatDate(order.createdAt)}</td>
+								{:else}
+									<td><span class="row__number" title={order.id}>{displayReference(order)}</span></td>
+									<td class="row__device">{order.deviceName}</td>
+									<td class="row__date">{order.preferredVisitAt ? formatVisit(order.preferredVisitAt) : '—'}</td>
+									<td class="row__date">{formatDate(order.createdAt)}</td>
+									<td><StatusSelect status={order.status} disabled={changing !== null} onchange={(next) => onStatusChange(order, next)} /></td>
+								{/if}
 							</tr>
 						{/each}
 					</tbody>
@@ -254,22 +260,25 @@
 				{#each pageOrders as order (order.id)}
 					<li class="card">
 						<div class="card__head">
-							<span class="card__number">{order.number}</span>
+							<span class="card__number" title={order.id}>{displayReference(order)}</span>
 							<span class="card__date">{formatDate(order.createdAt)}</span>
 						</div>
-						<p class="card__client">{order.clientName}</p>
 						<p class="card__device">{order.deviceName}</p>
-						<p class="card__service">{order.serviceName}</p>
+						{#if isMockMode}
+							<p class="card__client">{order.clientName ?? '—'}</p>
+							<p class="card__service">{order.serviceName ?? '—'}</p>
+						{/if}
+						{#if !isMockMode}
+							<p class="card__service">Желаемый визит: {order.preferredVisitAt ? formatVisit(order.preferredVisitAt) : '—'}</p>
+						{/if}
 						<div class="card__bottom">
-							<div class="card__price">
-								<span class="card__price-label">Цена</span>
-								<span class="card__price-value">{price(order)}</span>
-							</div>
-							<StatusSelect
-								status={order.status}
-								disabled={changing !== null}
-								onchange={(next) => onStatusChange(order, next)}
-							/>
+							{#if isMockMode}
+								<div class="card__price">
+									<span class="card__price-label">Цена</span>
+									<span class="card__price-value">{price(order)}</span>
+								</div>
+							{/if}
+							<StatusSelect status={order.status} disabled={changing !== null} onchange={(next) => onStatusChange(order, next)} />
 						</div>
 					</li>
 				{/each}
@@ -314,7 +323,9 @@
 	{/if}
 
 	<p class="orders__hint">
-		Измените статус в строке заявки — клиент увидит обновление на странице своего заказа.
+		{isMockMode
+			? 'Измените статус в строке заявки — клиент увидит обновление на странице своего заказа.'
+			: 'Backend API сейчас возвращает ID, устройство, статус и даты; данные клиента, услуги и цены в ответе отсутствуют.'}
 	</p>
 </div>
 
@@ -363,7 +374,7 @@
 	/* ── Stats ── */
 	.stats {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 16px;
 	}
 
@@ -721,7 +732,7 @@
 		}
 
 		.stats {
-			grid-template-columns: 1fr;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 
 		.toolbar {
