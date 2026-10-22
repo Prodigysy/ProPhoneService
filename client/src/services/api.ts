@@ -778,3 +778,41 @@ async function mockHideService(id: string): Promise<void> {
 	priceOverlay.hidden.add(id);
 	priceOverlay.updates.delete(id);
 }
+
+// ─── Sprint 2: master statistics dashboard (card 10/17) ─────────────────────
+
+export type StatsPeriod = 'month' | 'quarter' | 'all';
+
+export interface MasterStatsDto {
+	/** Completed repairs grouped by device type, e.g. «Phone» → 12. */
+	repairsByType: Record<string, number>;
+	/** Total price of completed orders in the period. */
+	completedSum: number;
+	/** Number of completed orders in the period. */
+	completedCount: number;
+}
+
+export async function fetchMasterStats(period: StatsPeriod): Promise<MasterStatsDto> {
+	if (isMockMode) return mockMasterStats(period);
+	try {
+		return await request<MasterStatsDto>(`/master/stats?period=${period}`);
+	} catch (error) {
+		if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return mockMasterStats(period);
+		throw error;
+	}
+}
+
+/** Demo data in the mockup's spirit: October 2026, mixed device types. */
+async function mockMasterStats(period: StatsPeriod): Promise<MasterStatsDto> {
+	await delay(250);
+	const all = {
+		Phone: 14,
+		Tablet: 4,
+		Laptop: 2
+	};
+	const month = { Phone: 6, Tablet: 2, Laptop: 1 };
+	const quarter = { Phone: 11, Tablet: 3, Laptop: 2 };
+	if (period === 'month') return { repairsByType: month, completedSum: 24890, completedCount: 9 };
+	if (period === 'quarter') return { repairsByType: quarter, completedSum: 84340, completedCount: 16 };
+	return { repairsByType: all, completedSum: 129800, completedCount: 20 };
+}
