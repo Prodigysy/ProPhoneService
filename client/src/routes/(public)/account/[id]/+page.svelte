@@ -56,7 +56,7 @@
 		}
 		busy = true;
 		try {
-			await createReview(order.id, rating, text.trim());
+			await createReview(order.id, rating, text.trim(), session.user?.name ?? 'Клиент');
 			alreadyReviewed = true;
 			showToast('Спасибо! Отзыв опубликован');
 		} catch (error) {

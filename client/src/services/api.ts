@@ -8,7 +8,7 @@
 // Order creation sends name, contact, device, visit time and the selected
 // service ids; the API computes the total price from those ids.
 
-import { serviceMeta, workshop } from '../mocks/db.ts';
+import { accountMock, reviews as mockReviews, serviceMeta, workshop } from '../mocks/db.ts';
 
 export type RepairStatus =
 	| 'Created'
@@ -624,7 +624,6 @@ export async function fetchMyOrders(): Promise<AccountOrderDto[]> {
 
 async function mockMyOrders(): Promise<AccountOrderDto[]> {
 	await delay();
-	const { accountMock } = await import('../mocks/db.ts');
 	return accountMock.orders.map((order) => ({ ...order, timeline: [...order.timeline] }));
 }
 
@@ -640,7 +639,6 @@ export async function fetchMyOrderById(id: string): Promise<AccountOrderDto> {
 
 async function mockMyOrderById(id: string): Promise<AccountOrderDto> {
 	await delay();
-	const { accountMock } = await import('../mocks/db.ts');
 	const order = accountMock.orders.find((item) => item.id === id);
 	if (!order) throw new ApiError('Заявка не найдена', 404);
 	return { ...order, timeline: [...order.timeline] };
@@ -650,30 +648,29 @@ async function mockMyOrderById(id: string): Promise<AccountOrderDto> {
 export async function createReview(
 	orderId: string,
 	rating: number,
-	text: string
+	text: string,
+	author = 'Клиент'
 ): Promise<ReviewDto> {
-	if (isMockMode) return mockCreateReview(rating, text);
+	if (isMockMode) return mockCreateReview(rating, text, author);
 	try {
 		return await request<ReviewDto>(`/orders/${encodeURIComponent(orderId)}/review`, {
 			method: 'POST',
 			body: JSON.stringify({ rating, text })
 		});
 	} catch (error) {
-		if (error instanceof ApiError && error.status === 404) return mockCreateReview(rating, text);
+		if (error instanceof ApiError && error.status === 404) return mockCreateReview(rating, text, author);
 		throw error;
 	}
 }
 
-async function mockCreateReview(rating: number, text: string): Promise<ReviewDto> {
+async function mockCreateReview(rating: number, text: string, author: string): Promise<ReviewDto> {
 	await delay(350);
-	const { accountMock } = await import('../mocks/db.ts');
 	if (accountMock.review.text) throw new ApiError('Отзыв уже оставлен', 409);
-	const user = (await import('#lib/auth/session.svelte.ts')).session.user;
 	accountMock.review.text = text;
 	accountMock.review.rating = rating;
 	return {
 		id: crypto.randomUUID(),
-		author: user?.name ?? 'Клиент',
+		author,
 		rating,
 		text,
 		createdAt: new Date().toISOString()
@@ -682,24 +679,24 @@ async function mockCreateReview(rating: number, text: string): Promise<ReviewDto
 
 /** Public reviews showcase (mock mode: the landing mockup reviews). */
 export async function fetchReviews(limit = 6): Promise<ReviewDto[]> {
-	if (isMockMode) return mockReviews(limit);
+	if (isMockMode) return mockReviewList(limit);
 	try {
 		return await request<ReviewDto[]>(`/reviews?limit=${limit}`);
 	} catch (error) {
-		if (error instanceof ApiError && error.status === 404) return mockReviews(limit);
+		if (error instanceof ApiError && error.status === 404) return mockReviewList(limit);
 		throw error;
 	}
 }
 
-async function mockReviews(limit: number): Promise<ReviewDto[]> {
+async function mockReviewList(limit: number): Promise<ReviewDto[]> {
 	await delay();
-	const { reviews } = await import('../mocks/db.ts');
-	return reviews.slice(0, limit).map((review) => ({
+	return mockReviews.slice(0, limit).map((review) => ({
 		id: review.id,
 		author: review.author,
 		rating: 5,
 		text: review.text,
-		createdAt: '2026-01-01T00:00:00Z'
+		// Display date from the mockup («24 сентября 2026»), not a synthetic ISO stamp.
+		createdAt: review.date
 	}));
 }
 

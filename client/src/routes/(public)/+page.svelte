@@ -2,10 +2,40 @@
 	import Eyebrow from '#lib/components/Eyebrow.svelte';
 	import Button from '#lib/components/Button.svelte';
 	import { workshop, workshopStats, masterProfile, aboutText, steps, reviews, heroTrust, heroBadge, getWorkshopStatus } from '../../mocks/db.ts';
+	import { fetchReviews, type ReviewDto } from '../../services/api.ts';
 
 	const workshopStatus = getWorkshopStatus();
 	const isOpen = workshopStatus.isOpen;
 	const openStatus = workshopStatus.message;
+
+	// Sprint-2 card 19: the showcase reads GET /api/reviews; while the backend
+	// endpoint (card 12) answers 404 the landing keeps the mockup reviews.
+	let showcase = $state<ReviewDto[]>(reviews.map((review) => ({
+		id: review.id,
+		author: review.author,
+		rating: 5,
+		text: review.text,
+		createdAt: review.date
+	})));
+	let expanded = $state<string | null>(null);
+
+	$effect(() => {
+		fetchReviews(6)
+			.then((list) => {
+				if (list.length > 0) showcase = list;
+			})
+			.catch(() => {
+				// keep the mockup reviews as the fallback
+			});
+	});
+
+	function formatReviewDate(input: string): string {
+		// API dates are ISO; mock fallback uses ready-made display dates.
+		if (/\d{4}-\d{2}-\d{2}/.test(input)) {
+			return new Date(input).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+		}
+		return input;
+	}
 </script>
 
 <!-- ================= Hero ================= -->
@@ -169,15 +199,20 @@
 			</p>
 		</div>
 		<div class="reviews">
-			{#each reviews as review (review.id)}
+			{#each showcase as review (review.id)}
 				<article class="review">
-					<p class="review__stars" aria-label="Оценка 5 из 5">★★★★★</p>
-					<p class="review__text">{review.text}</p>
+					<p class="review__stars" aria-label={`Оценка ${review.rating} из 5`}>{'★'.repeat(review.rating)}</p>
+					<p class="review__text" class:review__text--clamped={expanded !== review.id && review.text.length > 140}>
+						{review.text}
+					</p>
+					{#if review.text.length > 140 && expanded !== review.id}
+						<button class="review__more" type="button" onclick={() => (expanded = review.id)}>читать полностью</button>
+					{/if}
 					<footer class="review__footer">
-						<span class="review__avatar" aria-hidden="true">{review.initials}</span>
+						<span class="review__avatar" aria-hidden="true">{review.author.slice(0, 1)}{review.author.split(' ')[1]?.[0] ?? ''}</span>
 						<div class="review__meta">
 							<span class="review__author">{review.author}</span>
-							<span class="review__date">{review.date}</span>
+							<span class="review__date">{formatReviewDate(review.createdAt)}</span>
 						</div>
 					</footer>
 				</article>
@@ -551,6 +586,27 @@
 	.review__text {
 		font-size: 14px;
 		line-height: 1.65;
+	}
+
+	.review__text--clamped {
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.review__more {
+		align-self: flex-start;
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--accent);
+		margin-top: -6px;
+	}
+
+	.review__more:hover {
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 
 	.review__footer {
