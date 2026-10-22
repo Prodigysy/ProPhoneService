@@ -716,7 +716,7 @@ export async function createService(input: ServiceInput): Promise<ServiceDto> {
 	try {
 		return asService(await request<Record<string, unknown>>('/services', { method: 'POST', body: JSON.stringify(input) }));
 	} catch (error) {
-		if (error instanceof ApiError && error.status === 404) return mockCreateService(input);
+		if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return mockCreateService(input);
 		throw error;
 	}
 }
@@ -733,7 +733,7 @@ export async function updateService(id: string, input: ServiceInput): Promise<vo
 	try {
 		await request<void>(`/services/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) });
 	} catch (error) {
-		if (error instanceof ApiError && error.status === 404) return mockUpdateService(id, input);
+		if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return mockUpdateService(id, input);
 		throw error;
 	}
 }
@@ -757,7 +757,7 @@ export async function hideService(id: string): Promise<void> {
 	try {
 		await request<void>(`/services/${encodeURIComponent(id)}`, { method: 'DELETE' });
 	} catch (error) {
-		if (error instanceof ApiError && error.status === 404) return mockHideService(id);
+		if (error instanceof ApiError && (error.status === 404 || error.status === 405)) return mockHideService(id);
 		throw error;
 	}
 }

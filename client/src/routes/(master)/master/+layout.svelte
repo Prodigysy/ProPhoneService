@@ -2,15 +2,16 @@
 	import Toast from '#lib/components/Toast.svelte';
 	import { showToast } from '#lib/components/toast.svelte.ts';
 	import { theme } from '#lib/theme/theme.svelte.ts';
+	import { page } from '$app/state';
 	import { masterProfile, workshop } from '../../../mocks/db.ts';
 
 	let { children } = $props();
 
 	const navItems = [
-		{ id: 'orders', label: 'Заявки' },
-		{ id: 'clients', label: 'Клиенты' },
-		{ id: 'price', label: 'Прайс-лист' },
-		{ id: 'reports', label: 'Отчёты' }
+		{ id: 'orders', label: 'Заявки', href: '/master/orders' },
+		{ id: 'clients', label: 'Клиенты', href: null },
+		{ id: 'price', label: 'Прайс-лист', href: '/master/services' },
+		{ id: 'reports', label: 'Отчёты', href: '/master/stats' }
 	];
 
 	const ordersCount = 12;
@@ -26,10 +27,16 @@
 
 		<nav class="sidebar__nav" aria-label="Разделы кабинета">
 			{#each navItems as item (item.id)}
-				{#if item.id === 'orders'}
-					<a class="sidebar__item sidebar__item--active" href="/master/orders" aria-current="page">
+				{#if item.href}
+					<a
+						class="sidebar__item"
+						class:sidebar__item--active={page.url.pathname.startsWith(item.href)}
+						href={item.href}
+					>
 						{item.label}
-						<span class="sidebar__count">{ordersCount}</span>
+						{#if item.id === 'orders'}
+							<span class="sidebar__count">{ordersCount}</span>
+						{/if}
 					</a>
 				{:else}
 					<button
