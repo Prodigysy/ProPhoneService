@@ -240,6 +240,91 @@ export const heroBadge = {
 	subtitle: 'Ремонтируем, а не усложняем'
 };
 
+// ─── Client account (mockup V2 p4: личный кабинет) ─────────────────────────
+
+export interface AccountOrder {
+	id: string;
+	createdAt: string;
+	device: string;
+	repair: string;
+	status: 'InProgress' | 'Ready';
+	price: number;
+	/** Timeline entries for the repair card. */
+	timeline: { label: string; at: string }[];
+	expectedReady: string;
+}
+
+export const accountMock = {
+	user: {
+		id: 'a1f3c2d4-0000-4a01-9c11-000000000000',
+		name: 'Анна Смирнова',
+		phone: '+7 (916) 234-56-78',
+		email: 'anna@example.com'
+	},
+	orders: [
+		{
+			id: 'acc-0001',
+			createdAt: '2026-10-01T10:12:00Z',
+			device: 'iPhone 13',
+			repair: 'Замена аккумулятора',
+			status: 'InProgress',
+			price: 3490,
+			expectedReady: 'Ожидаемая готовность: 2 октября 2026, до 18:00',
+			timeline: [
+				{ label: 'Заявка принята', at: '01.10.2026, 10:12' },
+				{ label: 'Диагностика', at: '01.10.2026, 11:40' },
+				{ label: 'Согласована цена', at: '01.10.2026, 13:05' },
+				{ label: 'В ремонте', at: '01.10.2026, 15:20' }
+			]
+		},
+		{
+			id: 'acc-0002',
+			createdAt: '2026-08-12T09:30:00Z',
+			device: 'iPhone 13',
+			repair: 'Замена дисплея',
+			status: 'Ready',
+			price: 9900,
+			expectedReady: '',
+			timeline: [
+				{ label: 'Заявка принята', at: '12.08.2026, 09:30' },
+				{ label: 'Диагностика', at: '12.08.2026, 10:10' },
+				{ label: 'В ремонте', at: '12.08.2026, 11:00' },
+				{ label: 'Готово', at: '12.08.2026, 15:45' }
+			]
+		},
+		{
+			id: 'acc-0003',
+			createdAt: '2026-05-24T12:00:00Z',
+			device: 'Samsung Galaxy A52',
+			repair: 'Замена разъёма зарядки',
+			status: 'Ready',
+			price: 2490,
+			expectedReady: '',
+			timeline: [
+				{ label: 'Заявка принята', at: '24.05.2026, 12:00' },
+				{ label: 'Готово', at: '24.05.2026, 18:20' }
+			]
+		},
+		{
+			id: 'acc-0004',
+			createdAt: '2026-02-03T14:00:00Z',
+			device: 'iPhone 11',
+			repair: 'Замена аккумулятора',
+			status: 'Completed',
+			price: 2990,
+			expectedReady: '',
+			timeline: [
+				{ label: 'Заявка принята', at: '03.02.2026, 14:00' },
+				{ label: 'Готово', at: '03.02.2026, 17:30' }
+			]
+		}
+	] as AccountOrder[],
+	review: {
+		text: '',
+		rating: 0
+	}
+};
+
 export const steps = [
 	{
 		num: '01',

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { theme } from '#lib/theme/theme.svelte.ts';
+	import { session } from '#lib/auth/session.svelte.ts';
 	import { page } from '$app/state';
 
 	interface Props {
@@ -30,14 +31,14 @@
 		<nav class="header__nav" aria-label="Основная навигация">
 			<a class="header__link" class:header__link--active={isActive('/', true)} aria-current={isActive('/', true) ? 'page' : undefined} href="/">Главная</a>
 			<a class="header__link" class:header__link--active={isActive('/price')} aria-current={isActive('/price') ? 'page' : undefined} href="/price">Прайс-лист</a>
-			<button
-				class="header__link header__link--disabled"
-				type="button"
-				aria-disabled="true"
-				title="Личный кабинет появится после авторизации"
+			<a
+				class="header__link"
+				class:header__link--active={isActive('/account') || isActive('/login')}
+				aria-current={isActive('/account') ? 'page' : undefined}
+				href={session.user ? '/account' : '/login'}
 			>
 				Личный кабинет
-			</button>
+			</a>
 		</nav>
 
 		<div class="header__actions">
@@ -157,14 +158,6 @@
 
 	.header__link--active:hover {
 		color: var(--accent);
-	}
-
-	.header__link--disabled {
-		cursor: not-allowed;
-	}
-
-	.header__link--disabled:hover {
-		color: var(--muted);
 	}
 
 	.header__actions {
