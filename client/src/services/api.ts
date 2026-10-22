@@ -418,12 +418,73 @@ export async function fetchOrders(options: FetchOrdersOptions = {}): Promise<Rep
 	return result;
 }
 
-export async function fetchServices(): Promise<ServiceDto[]> {
-	if (isMockMode) {
-		await delay();
-		return mockServices.map((service) => ({ ...service }));
+// Sprint-2 card 8 does not ship PUT/POST/DELETE /services yet: a write that
+// answers 404 is recorded in a local overlay merged into every read, so the
+// master panel edits stay visible. Successful real writes clear their
+// overlay entry; once the card lands the overlay stays empty.
+interface PriceOverlay {
+	created: ServiceDto[];
+	updates: Map<string, ServiceInput>;
+	hidden: Set<string>;
+}
+
+const priceOverlay: PriceOverlay = { created: [], updates: new Map(), hidden: new Set() };
+
+function asService(raw: Record<string, unknown>): ServiceDto {
+	return {
+		id: String(raw['id'] ?? ''),
+		name: String(raw['name'] ?? ''),
+		price: Number(raw['price'] ?? 0),
+		description: (raw['description'] as string | null) ?? null,
+		// Card 8 adds the flag; without it every service is active.
+		isActive: (raw['isActive'] as boolean | undefined) ?? (raw['is_active'] as boolean | undefined) ?? true
+	};
+}
+
+/** Merges local create/update/hide edits into an API list (API mode). */
+function applyPriceOverlay(list: ServiceDto[]): ServiceDto[] {
+	const merged = list.map((service) => {
+		const update = priceOverlay.updates.get(service.id);
+		return update ? { ...service, ...update } : service;
+	});
+	for (const id of priceOverlay.hidden) {
+		const service = merged.find((item) => item.id === id);
+		if (service) service.isActive = false;
 	}
-	return request<ServiceDto[]>('/services');
+	return [...priceOverlay.created, ...merged];
+}
+
+async function mockServiceList(): Promise<ServiceDto[]> {
+	await delay();
+	return mockServices.map((service) => ({ ...service }));
+}
+
+/** Public services: active only; overlay-aware and 404-safe. */
+export async function fetchServices(): Promise<ServiceDto[]> {
+	if (isMockMode) return (await mockServiceList()).filter((service) => service.isActive);
+	let raw: ServiceDto[];
+	try {
+		raw = (await request<Record<string, unknown>[]>('/services')).map(asService);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) {
+			return (await mockServiceList()).filter((service) => service.isActive);
+		}
+		throw error;
+	}
+	return applyPriceOverlay(raw).filter((service) => service.isActive);
+}
+
+/** Master panel list — includes hidden services (public list shows active only). */
+export async function fetchMasterServices(): Promise<ServiceDto[]> {
+	if (isMockMode) return mockServiceList();
+	let raw: ServiceDto[];
+	try {
+		raw = (await request<Record<string, unknown>[]>('/services?includeInactive=true')).map(asService);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockServiceList();
+		throw error;
+	}
+	return applyPriceOverlay(raw);
 }
 
 export async function fetchOrderById(id: string): Promise<RepairOrderDto> {
@@ -640,4 +701,80 @@ async function mockReviews(limit: number): Promise<ReviewDto[]> {
 		text: review.text,
 		createdAt: '2026-01-01T00:00:00Z'
 	}));
+}
+
+// ─── Sprint 2: master price management (cards 8, 16) ────────────────────────
+
+export interface ServiceInput {
+	name: string;
+	price: number;
+	description: string | null;
+}
+
+export async function createService(input: ServiceInput): Promise<ServiceDto> {
+	if (isMockMode) return mockCreateService(input);
+	try {
+		return asService(await request<Record<string, unknown>>('/services', { method: 'POST', body: JSON.stringify(input) }));
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockCreateService(input);
+		throw error;
+	}
+}
+
+async function mockCreateService(input: ServiceInput): Promise<ServiceDto> {
+	await delay(300);
+	const created: ServiceDto = { id: `local-${crypto.randomUUID()}`, isActive: true, ...input };
+	priceOverlay.created.push(created);
+	return { ...created };
+}
+
+export async function updateService(id: string, input: ServiceInput): Promise<void> {
+	if (isMockMode) return mockUpdateService(id, input);
+	try {
+		await request<void>(`/services/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) });
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockUpdateService(id, input);
+		throw error;
+	}
+}
+
+async function mockUpdateService(id: string, input: ServiceInput): Promise<void> {
+	await delay(300);
+	const local = priceOverlay.created.find((service) => service.id === id) ?? mockServices.find((item) => item.id === id);
+	if (local) {
+		local.name = input.name;
+		local.price = input.price;
+		local.description = input.description;
+		return;
+	}
+	// A real backend service edited before card 8 ships.
+	priceOverlay.updates.set(id, input);
+}
+
+/** Sprint-2 card 8: hiding, not deleting (is_active=false). */
+export async function hideService(id: string): Promise<void> {
+	if (isMockMode) return mockHideService(id);
+	try {
+		await request<void>(`/services/${encodeURIComponent(id)}`, { method: 'DELETE' });
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockHideService(id);
+		throw error;
+	}
+}
+
+async function mockHideService(id: string): Promise<void> {
+	await delay(300);
+	const localCreated = priceOverlay.created.find((service) => service.id === id);
+	if (localCreated) {
+		localCreated.isActive = false;
+		return;
+	}
+	if (mockServices.some((item) => item.id === id)) {
+		const local = mockServices.find((item) => item.id === id);
+		if (local) local.isActive = false;
+		return;
+	}
+	// A real backend service hidden before card 8 ships.
+	priceOverlay.hidden.add(id);
+	priceOverlay.updates.delete(id);
 }
