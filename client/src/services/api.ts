@@ -45,6 +45,8 @@ export interface ServiceDto {
 	name: string;
 	price: number;
 	description: string | null;
+	/** Sprint 2: master price management hides a service instead of deleting it. */
+	isActive: boolean;
 }
 
 /**
@@ -102,16 +104,16 @@ export const statusLabels: Record<RepairStatus, string> = {
 };
 
 const mockServices: ServiceDto[] = [
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e01', name: 'Диагностика (выявление неисправности)', price: 0, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e02', name: 'Замена дисплейного модуля', price: 1500, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e03', name: 'Замена разъема зарядки', price: 1200, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e04', name: 'Замена аккумулятора', price: 1500, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e05', name: 'Замена микрофона', price: 1500, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e06', name: 'Замена динамика', price: 1100, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e07', name: 'Замена кнопки', price: 1200, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e08', name: 'Замена камеры', price: 1500, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e09', name: 'Профилактика', price: 1000, description: null },
-	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e10', name: 'Чистка сеток и разъемов', price: 700, description: null }
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e01', name: 'Диагностика (выявление неисправности)', price: 0, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e02', name: 'Замена дисплейного модуля', price: 1500, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e03', name: 'Замена разъема зарядки', price: 1200, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e04', name: 'Замена аккумулятора', price: 1500, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e05', name: 'Замена микрофона', price: 1500, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e06', name: 'Замена динамика', price: 1100, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e07', name: 'Замена кнопки', price: 1200, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e08', name: 'Замена камеры', price: 1500, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e09', name: 'Профилактика', price: 1000, description: null, isActive: true },
+	{ id: '6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e10', name: 'Чистка сеток и разъемов', price: 700, description: null, isActive: true }
 ];
 
 // ─── Mock store (module-level, so changes persist during the session) ───────
@@ -345,7 +347,7 @@ function asFrontendOrder(order: BackendOrderDto): RepairOrderDto {
 	};
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const headers = new Headers(init?.headers);
 	if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 	const response = await fetch(`${apiBase}${path}`, { ...init, headers });
@@ -375,15 +377,28 @@ const delay = (ms = 250) => {
 	return promise;
 };
 
-export async function fetchOrders(): Promise<RepairOrderDto[]> {
+/** Sprint-2 card 7: optional from/to filter by creation date (ISO yyyy-mm-dd). */
+interface FetchOrdersOptions {
+	from?: string;
+	to?: string;
+}
+
+export async function fetchOrders(options: FetchOrdersOptions = {}): Promise<RepairOrderDto[]> {
 	if (isMockMode) {
 		await delay();
 		return [...orders];
 	}
 
+	// Backend card 7 filters by from/to on this endpoint; until it ships the
+	// params are simply ignored by the current API.
+	const params = new URLSearchParams();
+	if (options.from) params.set('from', options.from);
+	if (options.to) params.set('to', options.to);
+	const suffix = params.size > 0 ? `&${params.toString()}` : '';
+
 	const result: RepairOrderDto[] = [];
 	for (let page = 1; ; page++) {
-		const items = await request<BackendOrderDto[]>(`/orders?page=${page}`);
+		const items = await request<BackendOrderDto[]>(`/orders?page=${page}${suffix}`);
 		result.push(...items.map(asFrontendOrder));
 		if (items.length < apiPageSize) break;
 	}
@@ -486,4 +501,143 @@ export async function changeOrderStatus(
 		method: 'PATCH',
 		body: JSON.stringify({ status: next, comment })
 	});
+}
+
+// ─── Sprint 2: client account (cards 4, 14, 18) ─────────────────────────────
+
+export interface AccountOrderDto {
+	id: string;
+	device: string;
+	repair: string;
+	/** ISO date of the order creation. */
+	createdAt: string;
+	status: RepairStatus;
+	price: number;
+	expectedReady: string | null;
+	timeline: { label: string; at: string }[];
+}
+
+export interface ReviewDto {
+	id: string;
+	author: string;
+	rating: number;
+	text: string;
+	/** ISO date the review was posted. */
+	createdAt: string;
+}
+
+function mapAccountOrder(raw: Record<string, unknown>): AccountOrderDto {
+	// Contract from card 4 (GET /api/me/orders/{id}): device, services, price,
+	// status timeline. Field names are not settled until the backend lands;
+	// map defensively so a missing field degrades to an empty cell.
+	const device = String(raw['device'] ?? '');
+	const repair = String(raw['repair'] ?? raw['services'] ?? '');
+	return {
+		id: String(raw['id'] ?? ''),
+		device,
+		repair,
+		createdAt: String(raw['createdAt'] ?? ''),
+		status: (raw['status'] as AccountOrderDto['status']) ?? 'Ready',
+		price: Number(raw['price'] ?? 0),
+		expectedReady: (raw['expectedReady'] as string | null) ?? null,
+		timeline: Array.isArray(raw['timeline'])
+			? (raw['timeline'] as AccountOrderDto['timeline'])
+			: []
+	};
+}
+
+/** Orders of the signed-in client. 404 (endpoint not shipped yet) → demo account. */
+export async function fetchMyOrders(): Promise<AccountOrderDto[]> {
+	if (isMockMode) return mockMyOrders();
+	try {
+		const items = await request<Record<string, unknown>[]>('/me/orders');
+		return items.map(mapAccountOrder);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) {
+			const mock = await mockMyOrders();
+			return mock;
+		}
+		throw error;
+	}
+}
+
+async function mockMyOrders(): Promise<AccountOrderDto[]> {
+	await delay();
+	const { accountMock } = await import('../mocks/db.ts');
+	return accountMock.orders.map((order) => ({ ...order, timeline: [...order.timeline] }));
+}
+
+export async function fetchMyOrderById(id: string): Promise<AccountOrderDto> {
+	if (isMockMode) return mockMyOrderById(id);
+	try {
+		return await request<Record<string, unknown>>(`/me/orders/${encodeURIComponent(id)}`).then(mapAccountOrder);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockMyOrderById(id);
+		throw error;
+	}
+}
+
+async function mockMyOrderById(id: string): Promise<AccountOrderDto> {
+	await delay();
+	const { accountMock } = await import('../mocks/db.ts');
+	const order = accountMock.orders.find((item) => item.id === id);
+	if (!order) throw new ApiError('Заявка не найдена', 404);
+	return { ...order, timeline: [...order.timeline] };
+}
+
+/** Posts a review for a completed order; a repeated review fails with 409. */
+export async function createReview(
+	orderId: string,
+	rating: number,
+	text: string
+): Promise<ReviewDto> {
+	if (isMockMode) return mockCreateReview(rating, text);
+	try {
+		return await request<ReviewDto>(`/orders/${encodeURIComponent(orderId)}/review`, {
+			method: 'POST',
+			body: JSON.stringify({ rating, text })
+		});
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockCreateReview(rating, text);
+		throw error;
+	}
+}
+
+async function mockCreateReview(rating: number, text: string): Promise<ReviewDto> {
+	await delay(350);
+	const { accountMock } = await import('../mocks/db.ts');
+	if (accountMock.review.text) throw new ApiError('Отзыв уже оставлен', 409);
+	const user = (await import('#lib/auth/session.svelte.ts')).session.user;
+	accountMock.review.text = text;
+	accountMock.review.rating = rating;
+	return {
+		id: crypto.randomUUID(),
+		author: user?.name ?? 'Клиент',
+		rating,
+		text,
+		createdAt: new Date().toISOString()
+	};
+}
+
+/** Public reviews showcase (mock mode: the landing mockup reviews). */
+export async function fetchReviews(limit = 6): Promise<ReviewDto[]> {
+	if (isMockMode) return mockReviews(limit);
+	try {
+		return await request<ReviewDto[]>(`/reviews?limit=${limit}`);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return mockReviews(limit);
+		throw error;
+	}
+}
+
+async function mockReviews(limit: number): Promise<ReviewDto[]> {
+	await delay();
+	const { reviews } = await import('../mocks/db.ts');
+	return reviews.slice(0, limit).map((review) => ({
+		id: review.id,
+		author: review.author,
+		rating: 5,
+		text: review.text,
+		createdAt: '2026-01-01T00:00:00Z'
+	}));
 }

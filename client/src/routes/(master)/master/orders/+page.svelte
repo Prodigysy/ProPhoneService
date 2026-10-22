@@ -34,6 +34,13 @@
 		orders
 			.filter((o) => filter === 'all' || o.status === filter)
 			.filter((o) => {
+				if (!dateFilterActive) return true;
+				const created = Date.parse(o.createdAt);
+				const from = dateFrom ? Date.parse(`${dateFrom}T00:00:00`) : -Infinity;
+				const to = dateTo ? Date.parse(`${dateTo}T23:59:59.999`) : Infinity;
+				return created >= from && created <= to;
+			})
+			.filter((o) => {
 				const q = query.trim().toLowerCase();
 				if (!q) return true;
 				return (
@@ -60,19 +67,49 @@
 		{ id: 'Ready', label: 'Готово', count: stats?.statusCounts.Ready ?? 0 }
 	]);
 
+	// ── Date filter (sprint-2 card 15) ─────────────────────────────────────
+	let dateFrom = $state('');
+	let dateTo = $state('');
+
+	async function loadOrders(): Promise<void> {
+		try {
+			const list = await fetchOrders({ from: dateFrom || undefined, to: dateTo || undefined });
+			orders = list;
+			stats = deriveMasterStats(list, !isMockMode);
+		} catch {
+			showToast('Не удалось загрузить заявки. Попробуйте обновить страницу.', 'error');
+		} finally {
+			loading = false;
+		}
+	}
+
 	// ── Load ────────────────────────────────────────────────────────────────
 	$effect(() => {
-		fetchOrders()
-			.then((list) => {
-				orders = list;
-				stats = deriveMasterStats(list, !isMockMode);
-			})
-			.catch(() => {
-				loadError = true;
-				showToast('Не удалось загрузить заявки. Попробуйте обновить страницу.', 'error');
-			})
-			.finally(() => (loading = false));
+		loadOrders();
 	});
+
+	// Apply the date filter server-side (card 7 contract); re-apply on change.
+	$effect(() => {
+		void dateFrom;
+		void dateTo;
+		if (!dateFrom && !dateTo) return;
+		if (isMockMode) return; // filtered client-side below
+		page = 1;
+		loadOrders();
+	});
+
+	// Client-side double-filter: exact today even before backend card 7 ships;
+	// once it filters server-side the client pass is a no-op on the same range.
+	const dateFilterActive = $derived(!!dateFrom || !!dateTo);
+
+	function resetDateFilter(): void {
+		dateFrom = '';
+		dateTo = '';
+		if (!isMockMode) {
+			page = 1;
+			loadOrders();
+		}
+	}
 
 	// Reset page when filters change
 	$effect(() => {
@@ -193,19 +230,43 @@
 		</select>
 	</div>
 
-	<!-- ── Status filter chips ── -->
-	<div class="chips" role="group" aria-label="Фильтр по статусу">
-		{#each chips as chip (chip.id)}
-			<button
-				class="chip"
-				class:chip--active={filter === chip.id}
-				aria-pressed={filter === chip.id}
-				onclick={() => (filter = chip.id)}
-			>
-				{chip.label}
-				<span class="chip__count">{chip.count}</span>
-			</button>
-		{/each}
+	<!-- ── Date filter (card 15) + status chips ── -->
+	<div class="filters">
+		<div class="chips" role="group" aria-label="Фильтр по статусу">
+			{#each chips as chip (chip.id)}
+				<button
+					class="chip"
+					class:chip--active={filter === chip.id}
+					aria-pressed={filter === chip.id}
+					onclick={() => (filter = chip.id)}
+				>
+					{chip.label}
+					<span class="chip__count">{chip.count}</span>
+				</button>
+			{/each}
+		</div>
+		<div class="daterange">
+			<input
+				class="daterange__input"
+				type="date"
+				aria-label="Заявки с даты"
+				max={dateTo || undefined}
+				bind:value={dateFrom}
+				onchange={() => (page = 1)}
+			/>
+			<span class="daterange__dash" aria-hidden="true">—</span>
+			<input
+				class="daterange__input"
+				type="date"
+				aria-label="Заявки по дату"
+				min={dateFrom || undefined}
+				bind:value={dateTo}
+				onchange={() => (page = 1)}
+			/>
+			{#if dateFrom || dateTo}
+				<button class="daterange__reset" type="button" onclick={resetDateFilter}>Сбросить</button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- ── Orders list ── -->
@@ -214,7 +275,7 @@
 	{:else if loadError}
 		<p class="state state--error">Заявки не загрузились. Обновите страницу.</p>
 	{:else if pageOrders.length === 0}
-		<p class="state">Заявок по фильтру нет.</p>
+		<p class="state">{dateFilterActive ? 'Ничего не найдено за выбранный период.' : 'Заявок по фильтру нет.'}</p>
 	{:else}
 		<section class="table" aria-label="Список заявок">
 			<!-- Desktop table -->
@@ -458,12 +519,57 @@
 		cursor: pointer;
 	}
 
+	/* ── Filters row (chips + dates) ── */
+	.filters {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		flex-wrap: wrap;
+		margin-top: 16px;
+	}
+
+	.daterange {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.daterange__input {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 9px 12px;
+		font-size: 13px;
+		color: var(--text);
+	}
+
+	.daterange__input:focus {
+		border-color: var(--accent);
+		outline: none;
+	}
+
+	.daterange__dash {
+		color: var(--muted);
+	}
+
+	.daterange__reset {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--accent);
+		padding: 9px 10px;
+		border-radius: 10px;
+	}
+
+	.daterange__reset:hover {
+		background: var(--accent-soft);
+	}
+
 	/* ── Chips ── */
 	.chips {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
-		margin-top: -4px;
 	}
 
 	.chip {
