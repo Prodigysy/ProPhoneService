@@ -136,7 +136,7 @@ npm run preview
 |------------------------|------------|
 | `client`               | клиенты (uuid PK, name, phone, email, created_at) |
 | `device`               | техника (type, manufacturer, model, serial_number) |
-| `repair_order`         | заказ на ремонт (FK client_id, device_id; status, total_price, created_at) |
+| `repair_order`         | заказ на ремонт (FK client_id, device_id; status, total_price, preferred_visit_at, created_at) |
 | `repair_status_history`| история смены статусов заказа (status, changed_at, comment) |
 | `repair_order_service` | связка заказ↔услуга (FK repair_order_id, service_id; price) |
 | `service`              | прайс-лист услуг (name, description, price, is_active) |
@@ -146,29 +146,43 @@ npm run preview
 
 ```
 server/
-├── ProPhoneService.Domain.Shared/   # enum-ы, машина состояний (без зависимостей)
-├── ProPhoneService.Domain/          # сущности, интерфейсы IRepository
-├── ProPhoneService.Infrastructure.EfCore/  # DbContext, конфигурации, миграции, реализации репозиториев
-├── ProPhoneService.Api/             # эндпоинты, DI
-└── ProPhoneService.Api.Tests/      # xUnit
+├── ProPhoneService.Domain.Shared/        # enum-ы, машина состояний, WorkshopOptions (без зависимостей)
+├── ProPhoneService.Domain/               # сущности, интерфейсы IRepository, доменные исключения, VisitTimeValidator
+├── ProPhoneService.Infrastructure.EfCore/ # DbContext, конфигурации, миграции, реализации репозиториев, аудит
+├── ProPhoneService.Application.Contracts/ # DTO-контракты
+├── ProPhoneService.Application/          # сервисы (просмотр заявок, создание заявки, изменение статуса заявки, прайс-лист), маппинг Mapster
+├── ProPhoneService.Api/                  # контроллеры, DI
+└── ProPhoneService.Api.Tests/            # xUnit
 ```
 
-Репозитории - generic `IRepository<T>` + специализированные, scoped lifetime, batch-сохранение через `SaveChangesAsync`
+Слои направлены внутрь: `Api` -> `Application` -> `Domain`, Репозитории - generic `IRepository<T>` + специализированные, scoped lifetime, batch-сохранение через `SaveChangesAsync`
 
 ## Машина состояний заказа
 
-Смена статуса - только через `RepairOrder.ChangeStatus()`, Карта переходов - `RepairStatusTransitions` в `Domain.Shared`.
-Заказ создаётся фабрикой `RepairOrder.Create(...)` (или вручную через `Start()`): до инициализации `Status == null` и `ChangeStatus` выбрасывает исключение
+Смена статуса - только через `RepairOrder.ChangeStatus()`, карта переходов - `RepairStatusTransitions` в `Domain.Shared`
+Заказ создаётся фабрикой `RepairOrder.Create(...)`: до инициализации `Status == null`, `ChangeStatus` выбрасывает исключение
 
 ```
-Матрица переходов: Created → Diagnostics → Agreed → InProgress → Ready → Completed; отмена (Cancelled) из Created/Agreed/InProgress
+Created → InDiagnostic → Agreed → InProgress → Ready → Completed; отмена (Cancelled) из Created/Agreed/InProgress
 ```
 
-Каждая смена пишет запись в `repair_status_history`, Запрещённый переход -> `InvalidOperationException`, конфликт параллельных изменений (токен конкурентности `xmin`) -> `DbUpdateConcurrencyException` (на уровне API оба будут 409)
+Каждая смена пишет запись в `repair_status_history` одним батчем. Запрещённый переход -> 409 Conflict. Конфликт параллельных изменений (токен конкурентности `xmin`) ловится в репозитории как `ConcurrencyConflictException` и тоже отдаётся как 409
+
+## Эндпоинты API
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/services` | прайс-лист активных услуг (HybridCache, 5 мин) |
+| GET | `/api/orders?status=&page=` | страница заявок панели мастера (фильтр по статусу, пагинация) |
+| GET | `/api/orders/{id}` | карточка заказа: клиент, устройство, услуги, тайм-лайн статусов |
+| POST | `/api/orders` | создание заявки (клиент find-or-create по телефону/email, 201 + номер) |
+| PATCH | `/api/orders/{id}/status` | смена статуса по машине состояний (409 при запрещённом переходе/конфликте) |
+
+Ошибки валидации возвращаются как `ValidationProblemDetails` со списком полей; при создании заявки обязательно должен быть телефон или почта, дата визита проверяется на рабочие часы и "не в прошлом"
 
 ## CI
 
-`.github/workflows/ci.yml` - конфигурация CI/CD, запускается на каждый PR и push в `main`:
+`.github/workflows/ci.yml` - конфигурация CI/CD, запускается на каждый push:
 
 - **backend**: `dotnet restore` → `build` → `test`
 - **client**: `npm ci` → `lint`

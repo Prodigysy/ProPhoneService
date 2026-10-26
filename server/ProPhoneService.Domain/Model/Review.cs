@@ -39,7 +39,7 @@ public class Review : IEntity
     /// Дата и время создания отзыва (UTC)
     /// </summary>
     [Column("created_at")]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     /// <summary>
     /// Клиент, оставивший отзыв

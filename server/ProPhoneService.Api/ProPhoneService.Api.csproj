@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\ProPhoneService.Domain\ProPhoneService.Domain.csproj" />
     <ProjectReference Include="..\ProPhoneService.Infrastructure.EfCore\ProPhoneService.Infrastructure.EfCore.csproj" />
+    <ProjectReference Include="..\ProPhoneService.Application\ProPhoneService.Application.csproj" />
+    <ProjectReference Include="..\ProPhoneService.Application.Contracts\ProPhoneService.Application.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

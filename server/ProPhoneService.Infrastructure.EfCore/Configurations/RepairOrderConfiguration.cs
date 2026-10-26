@@ -12,9 +12,13 @@ public class RepairOrderConfiguration : IEntityTypeConfiguration<RepairOrder>
     /// <inheritdoc />
     public void Configure(EntityTypeBuilder<RepairOrder> builder)
     {
-        // Токен конкурентности: uint + IsRowVersion маппится на системную колонку xmin,
-        // которая меняется при каждой модификации строки - защита от потерянных апдейтов
-        builder.Property<uint>("xmin").IsRowVersion();
+        // Токен конкурентности: системная колонка PostgreSQL xmin (id транзакции),
+        // меняется при каждом UPDATE — защита от потерянных апдейтов
+        builder.Property<uint>("xmin")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .IsRowVersion();
+
         builder.Property(x => x.Status).HasConversion<string>();
 
         builder.HasIndex(x => x.ClientId);

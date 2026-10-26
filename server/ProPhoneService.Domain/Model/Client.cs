@@ -42,7 +42,7 @@ public class Client : IEntity
     /// Дата и время регистрации клиента (UTC)
     /// </summary>
     [Column("created_at")]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     /// <summary>
     /// Заказы на ремонт, оформленные клиентом
