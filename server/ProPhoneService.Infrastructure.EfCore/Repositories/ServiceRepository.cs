@@ -18,4 +18,15 @@ public class ServiceRepository(ProPhoneServiceDbContext context) : EfRepository<
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Service>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        return await Set
+            .AsNoTracking()
+            .Where(x => x.IsActive && ids.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+    }
 }

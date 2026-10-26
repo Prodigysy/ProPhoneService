@@ -1,3 +1,4 @@
+using ProPhoneService.Domain.Exceptions;
 using ProPhoneService.Domain.Model;
 using ProPhoneService.Domain.Shared.Enum;
 
@@ -73,7 +74,7 @@ public class RepairStatusTransitionTests
         var order = CreateOrderInStatus(from);
         var historyCountBefore = order.StatusHistory.Count;
 
-        var exception = Assert.Throws<InvalidOperationException>(() => order.ChangeStatus(to));
+        var exception = Assert.Throws<InvalidStatusTransitionException>(() => order.ChangeStatus(to));
 
         Assert.Contains(from.ToString(), exception.Message);
         Assert.Contains(to.ToString(), exception.Message);
@@ -106,7 +107,7 @@ public class RepairStatusTransitionTests
     {
         var order = new RepairOrder { Id = Guid.NewGuid(), ClientId = Guid.NewGuid(), DeviceId = Guid.NewGuid() };
 
-        Assert.Throws<InvalidOperationException>(() => order.ChangeStatus(RepairStatus.InDiagnostic));
+        Assert.Throws<InvalidStatusTransitionException>(() => order.ChangeStatus(RepairStatus.InDiagnostic));
 
         Assert.Null(order.Status);
         Assert.Empty(order.StatusHistory);

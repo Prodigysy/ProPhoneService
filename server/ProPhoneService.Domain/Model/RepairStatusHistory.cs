@@ -34,7 +34,7 @@ public class RepairStatusHistory
     /// Дата и время смены статуса (UTC)
     /// </summary>
     [Column("changed_at")]
-    public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ChangedAt { get; set; }
 
     /// <summary>
     /// Комментарий к смене статуса (необязательно)

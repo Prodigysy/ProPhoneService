@@ -6,6 +6,8 @@ COPY ProPhoneService.Server.slnx ./
 COPY ProPhoneService.Domain.Shared/ ./ProPhoneService.Domain.Shared/
 COPY ProPhoneService.Domain/ ./ProPhoneService.Domain/
 COPY ProPhoneService.Infrastructure.EfCore/ ./ProPhoneService.Infrastructure.EfCore/
+COPY ProPhoneService.Application.Contracts/ ./ProPhoneService.Application.Contracts/
+COPY ProPhoneService.Application/ ./ProPhoneService.Application/
 COPY ProPhoneService.Api/ ./ProPhoneService.Api/
 
 RUN dotnet restore ProPhoneService.Api/ProPhoneService.Api.csproj

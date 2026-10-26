@@ -45,8 +45,8 @@ public class RepairOrderRepository(ProPhoneServiceDbContext context)
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RepairOrder>> GetByStatusAsync(
-        RepairStatus status,
+    public async Task<IReadOnlyList<RepairOrder>> GetPageAsync(
+        RepairStatus? status,
         int skip = 0,
         int take = 25,
         CancellationToken cancellationToken = default)
@@ -55,7 +55,9 @@ public class RepairOrderRepository(ProPhoneServiceDbContext context)
 
         return await Set
             .AsNoTracking()
-            .Where(x => x.Status == status)
+            .Include(x => x.Device)
+            .Include(x => x.StatusHistory)
+            .Where(x => status == null || x.Status == status)
             .OrderByDescending(x => x.CreatedAt)
             .ThenByDescending(x => x.Id)
             .Skip(skip)

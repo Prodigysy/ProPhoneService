@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="ProPhoneService.Api.Tests/ProPhoneService.Api.Tests.csproj" />
   <Project Path="ProPhoneService.Api/ProPhoneService.Api.csproj" />
+  <Project Path="ProPhoneService.Application.Contracts/ProPhoneService.Application.Contracts.csproj" />
+  <Project Path="ProPhoneService.Application/ProPhoneService.Application.csproj" />
   <Project Path="ProPhoneService.Domain.Shared/ProPhoneService.Domain.Shared.csproj" Id="30f22a6d-ee4e-49db-9d61-be1a2ee50a39" />
   <Project Path="ProPhoneService.Domain/ProPhoneService.Domain.csproj" Id="027cedc9-bbfb-4e21-a555-ab5414bf1c46" />
   <Project Path="ProPhoneService.Infrastructure.EfCore/ProPhoneService.Infrastructure.EfCore.csproj" Id="d49a2eb8-ad83-43c8-9bc3-91917f9787c6" />

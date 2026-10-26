@@ -25,11 +25,13 @@ public interface IRepairOrderRepository : IRepository<RepairOrder>
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Получить страницу заказов с отфильтрованным статусом, отсортированные по дате создания (новые сверху)
+    /// Получить страницу заказов, при указанном статусе — отфильтрованных по нему,
+    /// отсортированных по дате создания (новые сверху)
     /// </summary>
     /// <remarks>Для панели мастера (список заявок)</remarks>
-    Task<IReadOnlyList<RepairOrder>> GetByStatusAsync(
-        RepairStatus status,
+    /// <param name="status">Статус для фильтра или <c>null</c> — все заказы</param>
+    Task<IReadOnlyList<RepairOrder>> GetPageAsync(
+        RepairStatus? status,
         int skip = 0,
         int take = 25,
         CancellationToken cancellationToken = default);

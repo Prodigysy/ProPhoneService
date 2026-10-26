@@ -13,6 +13,7 @@ public class RepositoryRegistrationTests
     public void AddRepositories_ResolvesRepositories()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<TimeProvider>(TimeProvider.System);
         services.AddDbContext<ProPhoneServiceDbContext>(options =>
             options.UseNpgsql("Host=localhost;Database=prophoneservice_test"));
         services.AddRepositories();
@@ -37,6 +38,7 @@ public class RepositoryRegistrationTests
     public async Task GetAllAsync_RejectsInvalidPage()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<TimeProvider>(TimeProvider.System);
         services.AddDbContext<ProPhoneServiceDbContext>(options =>
             options.UseNpgsql("Host=localhost;Database=prophoneservice_test"));
         services.AddRepositories();

@@ -257,6 +257,78 @@ namespace ProPhoneService.Infrastructure.EfCore.Migrations
                     b.HasIndex("IsActive");
 
                     b.ToTable("service");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e01"),
+                            IsActive = true,
+                            Name = "Диагностика (выявление неисправности)",
+                            Price = 0m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e02"),
+                            IsActive = true,
+                            Name = "Замена дисплейного модуля",
+                            Price = 1500m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e03"),
+                            IsActive = true,
+                            Name = "Замена разъема зарядки",
+                            Price = 1200m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e04"),
+                            IsActive = true,
+                            Name = "Замена аккумулятора",
+                            Price = 1500m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e05"),
+                            IsActive = true,
+                            Name = "Замена микрофона",
+                            Price = 1500m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e06"),
+                            IsActive = true,
+                            Name = "Замена динамика",
+                            Price = 1100m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e07"),
+                            IsActive = true,
+                            Name = "Замена кнопки",
+                            Price = 1200m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e08"),
+                            IsActive = true,
+                            Name = "Замена камеры",
+                            Price = 1500m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e09"),
+                            IsActive = true,
+                            Name = "Профилактика",
+                            Price = 1000m
+                        },
+                        new
+                        {
+                            Id = new Guid("6f0d2a71-3f2e-4b1e-9d1f-0a1b2c3d4e10"),
+                            IsActive = true,
+                            Name = "Чистка сеток и разъемов",
+                            Price = 700m
+                        });
                 });
 
             modelBuilder.Entity("ProPhoneService.Domain.Model.RepairOrder", b =>

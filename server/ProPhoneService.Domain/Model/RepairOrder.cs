@@ -1,3 +1,4 @@
+using ProPhoneService.Domain.Exceptions;
 using ProPhoneService.Domain.Shared.Enum;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -47,7 +48,7 @@ public class RepairOrder : IEntity
     /// Дата и время создания заказа (UTC)
     /// </summary>
     [Column("created_at")]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     /// <summary>
     /// Предпочитаемая дата и время визита клиента (UTC)
@@ -88,7 +89,6 @@ public class RepairOrder : IEntity
             Id = Guid.NewGuid(),
             ClientId = clientId,
             DeviceId = deviceId,
-            CreatedAt = DateTime.UtcNow,
             PreferredVisitAt = preferredVisitAt,
         };
 
@@ -115,17 +115,17 @@ public class RepairOrder : IEntity
     /// </summary>
     /// <param name="next">Целевой статус</param>
     /// <param name="comment">Комментарий к смене статуса</param>
-    /// <exception cref="InvalidOperationException">Заказ не инициализирован или переход из текущего статуса в целевой запрещён</exception>
+    /// <exception cref="InvalidStatusTransitionException">Заказ не инициализирован или переход из текущего статуса в целевой запрещён</exception>
     public void ChangeStatus(RepairStatus next, string? comment = null)
     {
         if (Status is null)
         {
-            throw new InvalidOperationException("Заказ не инициализирован: сначала Start()");
+            throw new InvalidStatusTransitionException("Заказ не инициализирован: сначала Start()");
         }
 
         if (!RepairStatusTransitions.IsAllowed(Status.Value, next))
         {
-            throw new InvalidOperationException(
+            throw new InvalidStatusTransitionException(
                 $"Недопустимый переход статуса заказа: {Status} -> {next}");
         }
 
@@ -140,7 +140,7 @@ public class RepairOrder : IEntity
         Status = next;
         StatusHistory.Add(new RepairStatusHistory
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.Empty,
             RepairOrderId = Id,
             Status = next,
             Comment = comment,
